@@ -21,13 +21,9 @@ class MainWindow:
         
         # The map currently in use.
         self.map = maps.map1
-        # All units on the map currently in use.
-        self.all_units = []
         
         # The top-left pixel of the portion of the map being displayed in the battle display.
         self.focus_point = [0,0]
-        
-        self.load_sprites()
         
     def main_loop(self):
         # fps calculation variables
@@ -43,6 +39,11 @@ class MainWindow:
         last_time_pressed = time.clock()
         echoing = False
         
+        
+        # selection variables
+        selected_tile = None
+        selected_unit = None
+        
         while True:
             if fps_time_counter == 100:
                 fps_time_end = time.clock()
@@ -55,7 +56,7 @@ class MainWindow:
             # Define functions to be used in event handling
             
             
-            # Handle events
+            #~ Handle events
             for event in pygame.event.get():
                 if time.clock() < input_locked_until:
                     key_released = True
@@ -64,7 +65,9 @@ class MainWindow:
                 if event.type == pygame.QUIT: 
                     sys.exit()
                 elif event.type == MOUSEBUTTONDOWN:
+                    # Mouse click
                     if event.button == 1:
+                        # left click
                         click_pixels = event.pos
                         clicked_tile_x = None
                         clicked_tile_y = None
@@ -73,11 +76,13 @@ class MainWindow:
                         if click_pixels[1] >= cons.TOPEDGEMARGIN and click_pixels[1] < cons.TOPEDGEMARGIN + cons.BATTLE_DISPLAY_SIZE[1]:
                             clicked_tile_y = (self.focus_point[1] + click_pixels[1] - cons.TOPEDGEMARGIN) / cons.TILESIZE
                         if clicked_tile_x is not None and clicked_tile_y is not None:
-                            print("{},{}".format(clicked_tile_x, clicked_tile_y))
-                        pass
+                            selected_tile = self.map.tiles[clicked_tile_x][clicked_tile_y]
+                            selected_unit = selected_tile.unit
                     elif event.button == 3:
+                        # right click
                         pass
                 elif event.type == KEYDOWN:
+                    # Key press
                     key_released = False
                     echoing = False
                     last_key_pressed = event.key
@@ -91,6 +96,7 @@ class MainWindow:
                     elif event.key == K_d or event.key == K_RIGHT:
                         self.move_focus_right()
                 elif event.type == KEYUP:
+                    # Key up
                     if event.key == last_key_pressed:
                         key_released = True
                         echoing = False
@@ -113,8 +119,11 @@ class MainWindow:
             #~ Redraw screen
             # Draw the portion of the map that is in focus
             
-            focus_portion = self.map.background.subsurface(pygame.Rect(self.focus_point[0], self.focus_point[1],
+            focus_portion_base = self.map.background.subsurface(pygame.Rect(self.focus_point[0], self.focus_point[1],
                 cons.BATTLE_DISPLAY_SIZE[0], cons.BATTLE_DISPLAY_SIZE[1]))
+            
+            focus_portion = pygame.Surface((cons.BATTLE_DISPLAY_SIZE[0], cons.BATTLE_DISPLAY_SIZE[1]))
+            focus_portion.blit(focus_portion_base, (0,0)) # don't make a copy of this, it's slow as fuck
             
             # Draw grid line overlay
             for i in range(cons.TILESDOWN + 1):
@@ -133,10 +142,28 @@ class MainWindow:
             if self.focus_point[1] == self.map.pixel_size[1] - cons.BATTLE_DISPLAY_SIZE[1]:
                 pygame.draw.line(focus_portion, pygame.Color('Red'), (0, cons.TILESIZE*cons.TILESDOWN), (cons.TILESIZE*cons.TILESACROSS, cons.TILESIZE*cons.TILESDOWN))
                 pygame.draw.line(focus_portion, pygame.Color('Red'), (0, cons.TILESIZE*cons.TILESDOWN - 1), (cons.TILESIZE*cons.TILESACROSS, cons.TILESIZE*cons.TILESDOWN - 1))
-                
-            self.screen.blit(focus_portion, (cons.LEFTEDGEMARGIN, cons.TOPEDGEMARGIN))
             
-            #self.screen.blit(self.space1, pygame.Rect(50,50,0,0))
+            # Highlight selected tile
+            if selected_tile is not None and self.tile_in_focus(selected_tile.location):
+                topleft = self.pixel_of_tile(selected_tile.location)
+                highlight_width = cons.TILESIZE
+                highlight_thickness = 4
+                # Create a alpha subsurface
+                alpha_surface = pygame.Surface((highlight_width, highlight_width), pygame.SRCALPHA)
+                for i in range(1, 1+highlight_thickness):
+                    color = pygame.Color(0, 255, 0, 255 - 255*(i-1)/highlight_thickness)
+                    pygame.draw.line(alpha_surface, color, (i, i), (i, highlight_width - i))
+                    pygame.draw.line(alpha_surface, color, (i + 1, i), (highlight_width - i, i))
+                    pygame.draw.line(alpha_surface, color, (i + 1, highlight_width - i), (highlight_width - i, highlight_width - i))
+                    pygame.draw.line(alpha_surface, color, (highlight_width - i, i + 1), (highlight_width - i, highlight_width - i - 1))
+                focus_portion.blit(alpha_surface, topleft)
+            
+            # Draw units in focus
+            for unit in self.map.units:
+                if self.tile_in_focus(unit.location):
+                    focus_portion.blit(unit.sprite, self.pixel_of_tile(unit.location))
+            
+            self.screen.blit(focus_portion, (cons.LEFTEDGEMARGIN, cons.TOPEDGEMARGIN))
             
             # Draw fps indicator surface
             fps_surface = pygame.Surface((60, 40))
@@ -148,7 +175,29 @@ class MainWindow:
             self.screen.blit(fps_surface, (self.width - 60, 0))
             
             pygame.display.flip()
-        end = time.clock()
+    
+    # returns the top-left pixel coordinates of the given map tile.
+    def pixel_of_tile(self, xy):
+        x,y = xy[0], xy[1]
+        return (x * cons.TILESIZE - self.focus_point[0], y * cons.TILESIZE - self.focus_point[1])
+    
+    # returns whether the given map tile is in focus (and therefore must be drawn).
+    def tile_in_focus(self, xy):
+        x,y = xy[0], xy[1]
+        if self.pixel_in_focus((x * cons.TILESIZE, y*cons.TILESIZE)):
+            return True
+        elif self.pixel_in_focus(((x+1) * cons.TILESIZE - 1, y*cons.TILESIZE)):
+            return True
+        elif self.pixel_in_focus(((x+1) * cons.TILESIZE - 1, (y+1)*cons.TILESIZE)):
+            return True
+        elif self.pixel_in_focus(((x+1) * cons.TILESIZE - 1, y*cons.TILESIZE)):
+            return True
+        return False
+    
+    # returns whether a given pixel is in focus
+    def pixel_in_focus(self, xy):
+        x, y = xy[0], xy[1]
+        return self.focus_point[0] <= x and self.focus_point[0] + cons.TILESACROSS * cons.TILESIZE > x and self.focus_point[1] <= y and self.focus_point[1] + cons.TILESDOWN * cons.TILESIZE > y
     
     def move_focus_up(self):
         self.focus_point[1] = max(0, self.focus_point[1] - cons.TILESIZE)
@@ -163,10 +212,6 @@ class MainWindow:
     def move_focus_right(self):
         self.focus_point[0] = min(self.map.pixel_size[0] - cons.BATTLE_DISPLAY_SIZE[0], 
             self.focus_point[0] + cons.TILESIZE)
-    
-    # Loads sprites into memory
-    def load_sprites(self):
-        self.space1 = pygame.image.load('terrain/space1.png')
 
 if __name__ == "__main__":
     window= MainWindow()
