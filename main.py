@@ -121,7 +121,6 @@ class MainWindow:
                 pygame.draw.line(focus_portion, pygame.Color('White'), (0, i*cons.TILESIZE), (cons.TILESIZE*cons.TILESACROSS, i*cons.TILESIZE))
             for i in range(cons.TILESACROSS+ 1):
                 pygame.draw.line(focus_portion, pygame.Color('White'), (i*cons.TILESIZE, 0), (i*cons.TILESIZE, cons.TILESIZE*cons.TILESDOWN))
-            
             if self.focus_point[0] == 0:
                 pygame.draw.line(focus_portion, pygame.Color('Red'), (0, 0), (0, cons.TILESIZE*cons.TILESDOWN))
                 pygame.draw.line(focus_portion, pygame.Color('Red'), (1, 0), (1, cons.TILESIZE*cons.TILESDOWN))
