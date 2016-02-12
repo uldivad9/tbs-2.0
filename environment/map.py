@@ -89,7 +89,7 @@ for x in range(40):
         else:
             tiles1[x].append(Tile(x,y))
 background_size = get_background_size(tiles1)
-map1 = Map(generate_space(background_size[0], background_size[1], 60), tiles1)
+map1 = Map(generate_space(background_size[0], background_size[1], 150), tiles1)
 map1.add_unit(units.Leonidas.clone(), (0, 0))
 
 '''
