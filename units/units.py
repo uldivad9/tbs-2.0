@@ -14,7 +14,7 @@ sprite - pygame image
 '''
 
 class Unit:
-    def __init__(self, name="???", location=None, base_hp=None, base_attack=None, base_defense=None, base_speed=None, sprite=None):
+    def __init__(self, name="???", location=None, base_hp=None, base_attack=None, base_defense=None, base_speed=None, base_range=None, sprite=None):
         self.name = name
         self.location = location
         self.base_hp = base_hp
@@ -22,7 +22,9 @@ class Unit:
         self.base_attack = base_attack
         self.base_defense = base_defense
         self.base_speed = base_speed
+        self.base_range = base_range
         self.sprite = sprite
+        self.orientation = 0 # ccw
         self.hidden = False
     
     def clone(self):
@@ -37,7 +39,7 @@ class Unit:
         cloned.sprite = self.sprite
         return cloned
     
-    def get_real_speed():
+    def get_speed(self):
         return self.base_speed
 
-Leonidas = Unit(name="Leonidas", base_hp=10000, base_attack=1000, base_defense=1000, base_speed=5, sprite=pygame.image.load('assets/units/leonidas.png'))
+Leonidas = Unit(name="Leonidas", base_hp=10000, base_attack=1000, base_defense=1000, base_speed=10, base_range=8, sprite=pygame.image.load('assets/units/leonidas.png'))

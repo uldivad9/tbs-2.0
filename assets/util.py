@@ -16,6 +16,10 @@ def draw_text(text="", surface=None, location=(0,0), font=None, color=colors.whi
 def distance(a, b):
     return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
+def angle_between(a, b):
+    angle = math.atan2(b[0]-a[0], b[1]-a[1])
+    return (math.degrees(angle) + 180) % 360
+
 #~ Methods for detecting whether pixels are in the display
 # Returns true if the given pixel would be within the battle display.
 def pixel_in_focus(xy, focus_point):
@@ -23,7 +27,7 @@ def pixel_in_focus(xy, focus_point):
     return focus_point[0] <= x and focus_point[0] + cons.TILESACROSS * cons.TILESIZE > x and focus_point[1] <= y and focus_point[1] + cons.TILESDOWN * cons.TILESIZE > y
 
 # Returns true if part of the given tile would be within the battle display.
-def tile_in_focus(xy, focus_point):
+def loc_in_focus(xy, focus_point):
     x,y = xy[0], xy[1]
     if pixel_in_focus((x * cons.TILESIZE, y*cons.TILESIZE), focus_point):
         return True
@@ -35,14 +39,42 @@ def tile_in_focus(xy, focus_point):
         return True
     return False
 
+# returns the coordinates of the tile that the given pixel belongs to.
+def loc_of_pixel(xy, focus_point):
+    x,y = xy
+    return ((x - cons.BD_HMARGIN + focus_point[0]) / cons.TILESIZE, (y - cons.BD_VMARGIN + focus_point[1]) / cons.TILESIZE)
+
 # Returns the top-left pixel coordinates of the given map tile.
-def pixel_of_tile(xy, focus_point):
+def pixel_of_loc(xy, focus_point):
     x,y = xy
     return (x * cons.TILESIZE - focus_point[0] + cons.BD_HMARGIN, y * cons.TILESIZE - focus_point[1] + cons.BD_VMARGIN)
 
-def abs_pixel_of_tile(xy):
+# Returns the absolute pixel coordinates (not relative to the focus point) of the given map tile. As if the entire map were being displayed.
+def abs_pixel_of_loc(xy):
     x,y = xy
     return (x * cons.TILESIZE + cons.BD_HMARGIN, y * cons.TILESIZE + cons.BD_VMARGIN)
+
+#~ BFS
+def bfs(map, start, range, blockable = True):
+    frontier = Queue()
+    frontier.put(start, 0)
+    cost_so_far = {start:0}
+    
+    while not frontier.empty():
+        current = frontier.get()
+        
+        if blockable:
+            neighbors = map.neighboring_locations(current)
+        else:
+            neighbors = map.adjacent_locations(current)
+        for next in neighbors:
+            new_cost = cost_so_far[current] + 1
+            if next not in cost_so_far and new_cost <= range:
+                cost_so_far[next] = new_cost
+                frontier.put(next)
+    
+    cost_so_far.pop(start)
+    return cost_so_far
 
 #~ A* algorithm methods
 class PriorityQueue(Queue):
@@ -112,3 +144,13 @@ def a_star(map, start, goal):
         current = came_from[current]
         path.insert(0, current)
     return path
+
+# takes a tile-by-tile path and reduces it to start/end/turn points.
+def simplify_path(path):
+    key_points = []
+    for i, dest in enumerate(path):
+        if i == 0 or i == len(path) - 1:
+            key_points.append(dest)
+        elif not (2 * path[i][0] == path[i-1][0] + path[i+1][0] and 2 * path[i][1] == path[i-1][1] + path[i+1][1]):
+            key_points.append(dest)
+    return key_points

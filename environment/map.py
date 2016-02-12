@@ -41,6 +41,14 @@ class Map:
         x, y = xy
         return x >= 0 and x < len(self.tiles) and y >= 0 and y < len(self.tiles[0])
     
+    def adjacent_locations(self, xy):
+        x, y = xy
+        neighbors = []
+        for loc in [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]:
+            if self.on_map(loc):
+                neighbors.append(loc)
+        return neighbors
+    
     def neighboring_locations(self, xy):
         x, y = xy
         neighbors = []
@@ -76,7 +84,10 @@ tiles1 = []
 for x in range(40):
     tiles1.append([])
     for y in range(30):
-        tiles1[x].append(Tile(x,y))
+        if x + y > 5 and random.random() < 0.3:
+            tiles1[x].append(Tile(x,y, traversable=False))
+        else:
+            tiles1[x].append(Tile(x,y))
 background_size = get_background_size(tiles1)
 map1 = Map(generate_space(background_size[0], background_size[1], 60), tiles1)
 map1.add_unit(units.Leonidas.clone(), (0, 0))
