@@ -7,6 +7,8 @@ import colors
 """
 All animation classes should have:
 active: whether the animation is still active or not.
+waiting: whether the animation should lock most input.
+locking: whether the animation should lock ALL input, including screen panning.
 in_focus(focus_point): returns whether the animation should be drawn on the screen, given the focus_point.
 draw(focus_point, surface): draw the animation on the given surface
 spawn(): spawns 
@@ -18,6 +20,8 @@ class Animation():
     def __init__(self, spawn=[]):
         self.spawn = spawn
         self.active = True
+        self.waiting = False
+        self.locking = False
         
     def spawn():
         return self.spawn
@@ -47,6 +51,8 @@ class MovementAnimation():
         self.next_destination()
         self.location = self.start
         self.spawn = spawn
+        self.waiting = True
+        self.locking = False
     
     def spawn():
         return self.spawn
@@ -115,6 +121,8 @@ class LaserAnimation():
         if self.source is not None:
             self.previous_orientation = self.source.orientation
             self.source.orientation = angle_between(point1, point2)
+        self.waiting = True
+        self.locking = False
     
     def spawn():
         return self.spawn

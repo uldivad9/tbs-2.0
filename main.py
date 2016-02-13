@@ -91,6 +91,14 @@ class MainWindow:
             fps_time_counter += 1
             
             #~ Handle game flow
+            waiting = False
+            locking = False
+            for animation in self.map.animations:
+                if animation.locking:
+                    waiting = True
+                    locking = True
+                elif animation.waiting:
+                    waiting = True
             
             #~ Handle events
             for event in pygame.event.get():
@@ -98,9 +106,11 @@ class MainWindow:
                     key_released = True
                     echoing = False
                     break
-                if event.type == pygame.QUIT: 
+                if event.type == pygame.QUIT:
                     sys.exit()
                 elif event.type == MOUSEBUTTONDOWN:
+                    if waiting or locking:
+                        continue
                     # Mouse click
                     if event.button == 1:
                         # left click
@@ -159,6 +169,8 @@ class MainWindow:
                         # right click
                         pass
                 elif event.type == KEYDOWN:
+                    if locking:
+                        continue
                     # Key press
                     key_released = False
                     echoing = False
@@ -173,6 +185,8 @@ class MainWindow:
                     elif event.key == K_d or event.key == K_RIGHT:
                         self.move_focus_right()
                 elif event.type == KEYUP:
+                    if locking:
+                        continue
                     # Key up
                     if event.key == last_key_pressed:
                         key_released = True
