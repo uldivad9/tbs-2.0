@@ -8,6 +8,7 @@ from tile import Tile
 sys.path.append("{}/units".format(local_path))
 import constants as cons
 import units
+from team import Team
 
 class Map:
     def __init__(self, background_surface, tiles):
@@ -53,7 +54,7 @@ class Map:
         x, y = xy
         neighbors = []
         for loc in [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]:
-            if self.on_map(loc) and self.tiles[loc[0]][loc[1]].traversable:
+            if self.on_map(loc) and self.tiles[loc[0]][loc[1]].traversable and self.tiles[loc[0]][loc[1]].unit is None:
                 neighbors.append(loc)
         return neighbors
 
@@ -81,16 +82,21 @@ def generate_space(x, y, num_stars):
     return space
 
 tiles1 = []
+probe_locations = []
 for x in range(40):
     tiles1.append([])
     for y in range(30):
-        if x + y > 5 and random.random() < 0.3:
+        if x + y > 5 and random.random() < 0.27:
             tiles1[x].append(Tile(x,y, traversable=False))
         else:
             tiles1[x].append(Tile(x,y))
+            if x + y > 5 and random.random() < 0.02:
+                probe_locations.append((x,y))
 background_size = get_background_size(tiles1)
 map1 = Map(generate_space(background_size[0], background_size[1], 150), tiles1)
-map1.add_unit(units.Leonidas.clone(), (0, 0))
+map1.add_unit(units.Leonidas.clone(team=Team.PLAYER), (0, 0))
+for loc in probe_locations:
+    map1.add_unit(units.red_probe.clone(), loc)
 
 '''
 sys.path.append("{}/util".format(local_path))

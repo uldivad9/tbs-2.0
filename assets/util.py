@@ -55,7 +55,7 @@ def abs_pixel_of_loc(xy):
     return (x * cons.TILESIZE + cons.BD_HMARGIN, y * cons.TILESIZE + cons.BD_VMARGIN)
 
 #~ BFS
-def bfs(map, start, range, blockable = True):
+def bfs(map, start, range, blockable = True, include_start = True):
     frontier = Queue()
     frontier.put(start, 0)
     cost_so_far = {start:0}
@@ -73,7 +73,8 @@ def bfs(map, start, range, blockable = True):
                 cost_so_far[next] = new_cost
                 frontier.put(next)
     
-    cost_so_far.pop(start)
+    if not include_start:
+        cost_so_far.pop(start)
     return cost_so_far
 
 #~ A* algorithm methods

@@ -9,6 +9,7 @@ local_path = os.getcwd()
 sys.path.append("{}/assets".format(local_path))
 sys.path.append("{}/environment".format(local_path))
 from util import draw_text, a_star, bfs, loc_in_focus, pixel_of_loc, abs_pixel_of_loc, loc_of_pixel, simplify_path
+from team import Team
 import animations
 import colors
 import constants as cons
@@ -21,7 +22,7 @@ class MainWindow:
         self.width = width
         self.height = height
         self.screen = pygame.display.set_mode((self.width, self.height))
-        self.screen.fill(colors.space)
+        self.screen.fill(colors.BACKGROUND)
         
         # The map currently in use.
         self.map = maps.map1
@@ -43,6 +44,8 @@ class MainWindow:
         last_time_pressed = time.clock()
         echoing = False
         
+        # game flow variables
+        self.active_player = Team.PLAYER
         self.moved = False # whether the unit has moved and is waiting on an attack input
         
         # selection variables
@@ -50,7 +53,16 @@ class MainWindow:
         self.selected_unit = None
         self.locs_in_range = {}
         
-        # Define functions to be used in event handling
+        # Define functions to be used in game flow and event handling
+        def next_turn():
+            if self.active_player == Team.PLAYER:
+                self.active_player = Team.ENEMY
+            else:
+                self.active_player = Team.PLAYER
+            for unit in self.map.units:
+                if unit.team == self.active_player:
+                    unit.active = True
+        
         def deselect():
             self.selected_tile = None
             self.selected_unit = None
@@ -58,7 +70,12 @@ class MainWindow:
         
         def select(loc):
             self.selected_tile = self.map.get_tile(loc)
-            self.selected_unit = self.selected_tile.unit
+            
+            if self.selected_tile.unit is not None and self.selected_tile.unit.team == self.active_player:
+                self.selected_unit = self.selected_tile.unit
+            else:
+                self.selected_unit = None
+            
             if self.selected_unit is not None:
                 self.locs_in_range = bfs(self.map, self.selected_tile.location, self.selected_unit.get_speed())
             else:
@@ -72,6 +89,8 @@ class MainWindow:
                 fps_time_counter = 0
                 fps_time_start = time.clock()
             fps_time_counter += 1
+            
+            #~ Handle game flow
             
             #~ Handle events
             for event in pygame.event.get():
@@ -107,29 +126,29 @@ class MainWindow:
                                         
                                         # Actually move the selected unit to the selected tile.
                                         self.map.move_unit(self.selected_unit, clicked_loc)
-                                        
-                                        self.locs_in_range = bfs(self.map, self.selected_unit.location, self.selected_unit.get_range(), blockable = False)
+                                        # Attack selection
+                                        self.locs_in_range = bfs(self.map, self.selected_unit.location, self.selected_unit.get_range(), blockable = False, include_start = False)
                                         self.moved = True
                                     else:
                                         deselect()
                                 elif self.selected_tile.unit is self.selected_unit:
-                                    # deselect the tile and unit
-                                    deselect()
+                                    # Don't actually move, but go to attack selection
+                                    self.locs_in_range = bfs(self.map, self.selected_unit.location, self.selected_unit.get_range(), blockable = False, include_start = False)
+                                    self.moved = True
                                 else:
                                     # select a new tile and unit
                                     select(clicked_loc)
-                            else:
-                                if clicked_loc != self.selected_tile.location:
-                                    # Received attack input.
-                                    self.moved = False
-                                    
-                                    if clicked_loc in self.locs_in_range:
-                                        # attack selected tile
-                                        laser_animation = animations.LaserAnimation(pixel_of_loc(self.selected_tile.location, self.focus_point), pixel_of_loc(clicked_loc, self.focus_point), color=colors.green, source=self.selected_unit)
-                                        self.map.animations.append(laser_animation)
-                                    
-                                    deselect()
-                        else:
+                            else: # moved == True
+                                # Received attack input.
+                                self.moved = False
+                                
+                                if clicked_loc in self.locs_in_range:
+                                    # attack selected tile
+                                    laser_animation = animations.LaserAnimation(abs_pixel_of_loc(self.selected_tile.location), abs_pixel_of_loc(clicked_loc), color=colors.blue_laser, source=self.selected_unit)
+                                    self.map.animations.append(laser_animation)
+                                
+                                deselect()
+                        else: # self.selected_unit is None
                             if self.selected_tile == self.map.get_tile(clicked_loc):
                                 # If the same tile is clicked, deselect
                                 deselect()
@@ -181,21 +200,21 @@ class MainWindow:
             grid_y_offset = self.focus_point[1] % cons.TILESIZE
             # Draw grid line overlay
             for i in range(cons.TILESDOWN + 1):
-                pygame.draw.line(focus_portion, colors.gunmetal, (-grid_x_offset, i*cons.TILESIZE - grid_y_offset), (cons.TILESIZE*cons.TILESACROSS - grid_x_offset, i*cons.TILESIZE - grid_y_offset))
+                pygame.draw.line(focus_portion, colors.GRIDLINE, (-grid_x_offset, i*cons.TILESIZE - grid_y_offset), (cons.TILESIZE*cons.TILESACROSS - grid_x_offset, i*cons.TILESIZE - grid_y_offset))
             for i in range(cons.TILESACROSS+ 1):
-                pygame.draw.line(focus_portion, colors.gunmetal, (i*cons.TILESIZE - grid_x_offset, -grid_y_offset), (i*cons.TILESIZE - grid_x_offset, cons.TILESIZE*cons.TILESDOWN - grid_y_offset))
+                pygame.draw.line(focus_portion, colors.GRIDLINE, (i*cons.TILESIZE - grid_x_offset, -grid_y_offset), (i*cons.TILESIZE - grid_x_offset, cons.TILESIZE*cons.TILESDOWN - grid_y_offset))
             if self.focus_point[0] == 0:
-                pygame.draw.line(focus_portion, colors.red, (0, 0), (0, cons.TILESIZE*cons.TILESDOWN))
-                pygame.draw.line(focus_portion, colors.red, (1, 0), (1, cons.TILESIZE*cons.TILESDOWN))
+                pygame.draw.line(focus_portion, colors.MAP_BOUNDARY_LINE, (0, 0), (0, cons.TILESIZE*cons.TILESDOWN))
+                pygame.draw.line(focus_portion, colors.MAP_BOUNDARY_LINE, (1, 0), (1, cons.TILESIZE*cons.TILESDOWN))
             if self.focus_point[0] == self.map.pixel_size[0] - cons.BD_SIZE[0]:
-                pygame.draw.line(focus_portion, colors.red, (cons.TILESIZE*cons.TILESACROSS, 0), (cons.TILESIZE*cons.TILESACROSS, cons.TILESIZE*cons.TILESDOWN))
-                pygame.draw.line(focus_portion, colors.red, (cons.TILESIZE*cons.TILESACROSS - 1, 0), (cons.TILESIZE*cons.TILESACROSS - 1, cons.TILESIZE*cons.TILESDOWN))
+                pygame.draw.line(focus_portion, colors.MAP_BOUNDARY_LINE, (cons.TILESIZE*cons.TILESACROSS, 0), (cons.TILESIZE*cons.TILESACROSS, cons.TILESIZE*cons.TILESDOWN))
+                pygame.draw.line(focus_portion, colors.MAP_BOUNDARY_LINE, (cons.TILESIZE*cons.TILESACROSS - 1, 0), (cons.TILESIZE*cons.TILESACROSS - 1, cons.TILESIZE*cons.TILESDOWN))
             if self.focus_point[1] == 0:
-                pygame.draw.line(focus_portion, colors.red, (0, 0), (cons.TILESIZE*cons.TILESACROSS, 0))
-                pygame.draw.line(focus_portion, colors.red, (0, 1), (cons.TILESIZE*cons.TILESACROSS, 1))
+                pygame.draw.line(focus_portion, colors.MAP_BOUNDARY_LINE, (0, 0), (cons.TILESIZE*cons.TILESACROSS, 0))
+                pygame.draw.line(focus_portion, colors.MAP_BOUNDARY_LINE, (0, 1), (cons.TILESIZE*cons.TILESACROSS, 1))
             if self.focus_point[1] == self.map.pixel_size[1] - cons.BD_SIZE[1]:
-                pygame.draw.line(focus_portion, colors.red, (0, cons.TILESIZE*cons.TILESDOWN), (cons.TILESIZE*cons.TILESACROSS, cons.TILESIZE*cons.TILESDOWN))
-                pygame.draw.line(focus_portion, colors.red, (0, cons.TILESIZE*cons.TILESDOWN - 1), (cons.TILESIZE*cons.TILESACROSS, cons.TILESIZE*cons.TILESDOWN - 1))
+                pygame.draw.line(focus_portion, colors.MAP_BOUNDARY_LINE, (0, cons.TILESIZE*cons.TILESDOWN), (cons.TILESIZE*cons.TILESACROSS, cons.TILESIZE*cons.TILESDOWN))
+                pygame.draw.line(focus_portion, colors.MAP_BOUNDARY_LINE, (0, cons.TILESIZE*cons.TILESDOWN - 1), (cons.TILESIZE*cons.TILESACROSS, cons.TILESIZE*cons.TILESDOWN - 1))
             
             self.screen.blit(focus_portion, (cons.BD_HMARGIN, cons.BD_VMARGIN))
             
@@ -212,26 +231,26 @@ class MainWindow:
                     current_tile = self.map.tiles[tlx + x][tly + y]
                     if not current_tile.traversable:
                         pxx, pxy = pixel_of_loc(current_tile.location, self.focus_point)
-                        pygame.draw.line(self.screen, colors.darkred, (pxx, pxy), (pxx + cons.TILESIZE, pxy))
-                        pygame.draw.line(self.screen, colors.darkred, (pxx, pxy), (pxx, pxy + cons.TILESIZE))
-                        pygame.draw.line(self.screen, colors.darkred, (pxx, pxy + cons.TILESIZE), (pxx + cons.TILESIZE, pxy + cons.TILESIZE))
-                        pygame.draw.line(self.screen, colors.darkred, (pxx + cons.TILESIZE, pxy), (pxx + cons.TILESIZE, pxy + cons.TILESIZE))
-                        pygame.draw.line(self.screen, colors.darkred, (pxx, pxy+20), (pxx + 20, pxy))
-                        pygame.draw.line(self.screen, colors.darkred, (pxx, pxy+40), (pxx + 40, pxy))
-                        pygame.draw.line(self.screen, colors.darkred, (pxx, pxy+60), (pxx + 60, pxy))
-                        pygame.draw.line(self.screen, colors.darkred, (pxx + 20, pxy+60), (pxx + 60, pxy + 20))
-                        pygame.draw.line(self.screen, colors.darkred, (pxx + 40, pxy+60), (pxx + 60, pxy + 40))
+                        pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx, pxy), (pxx + cons.TILESIZE, pxy))
+                        pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx, pxy), (pxx, pxy + cons.TILESIZE))
+                        pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx, pxy + cons.TILESIZE), (pxx + cons.TILESIZE, pxy + cons.TILESIZE))
+                        pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx + cons.TILESIZE, pxy), (pxx + cons.TILESIZE, pxy + cons.TILESIZE))
+                        pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx, pxy+20), (pxx + 20, pxy))
+                        pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx, pxy+40), (pxx + 40, pxy))
+                        pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx, pxy+60), (pxx + 60, pxy))
+                        pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx + 20, pxy+60), (pxx + 60, pxy + 20))
+                        pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx + 40, pxy+60), (pxx + 60, pxy + 40))
                     if loc in self.locs_in_range:
                         if not self.moved:
-                            self.highlight_tile(loc, colors.darkgreen, 3)
+                            self.highlight_tile(loc, colors.MOVE_HIGHLIGHT, 3)
                         else:
-                            self.highlight_tile(loc, colors.darkpurple, 3)
+                            self.highlight_tile(loc, colors.ATTACK_HIGHLIGHT, 3)
             
 
             
             # Highlight selected tile
             if self.selected_tile is not None and loc_in_focus(self.selected_tile.location, self.focus_point):
-                self.highlight_tile(self.selected_tile.location, colors.white, 4)
+                self.highlight_tile(self.selected_tile.location, colors.SELECTION_HIGHLIGHT, 4)
             
             # Draw units in focus
             for unit in self.map.units:
@@ -254,20 +273,20 @@ class MainWindow:
             self.screen.set_clip(CS_origin[0], CS_origin[1], cons.CS_SIZE[0], cons.CS_SIZE[1])
             
             console = pygame.Surface((cons.CS_SIZE[0], cons.CS_SIZE[1]))
-            console.fill(colors.hologreen)
+            console.fill(colors.WINDOW)
             font = pygame.font.Font(None, 20)
             if self.selected_tile is None:
-                text = font.render("No loc selected", True, colors.holocyan)
+                text = font.render("No loc selected", True, colors.TEXT)
             else:
-                text = font.render("Selected loc: {},{}".format(self.selected_tile.x, self.selected_tile.y), True, colors.holocyan)
+                text = font.render("Selected loc: {},{}".format(self.selected_tile.x, self.selected_tile.y), True, colors.TEXT)
             console.blit(text, (10,10))
             if self.selected_unit is None:
-                draw_text("No unit selected", console, (10,30), font, colors.holocyan)
+                draw_text("No unit selected", console, (10,30), font, colors.TEXT)
             else:
-                draw_text("Selected unit: {}".format(self.selected_unit.name), console, (10,30), font, colors.holocyan)
-                draw_text("Location: {}".format(self.selected_unit.location), console, (10,50), font, colors.holocyan)
-            draw_text("Moved: {}".format(self.moved), console, (10,70), font, colors.holocyan)
-            draw_text("{} animations active".format(len(self.map.animations)), console, (10,90), font, colors.holocyan)
+                draw_text("Selected unit: {}".format(self.selected_unit.name), console, (10,30), font, colors.TEXT)
+                draw_text("Location: {}".format(self.selected_unit.location), console, (10,50), font, colors.TEXT)
+            draw_text("Moved: {}".format(self.moved), console, (10,70), font, colors.TEXT)
+            draw_text("{} animations active".format(len(self.map.animations)), console, (10,90), font, colors.TEXT)
             
             
             self.screen.blit(console, CS_origin)
@@ -276,10 +295,10 @@ class MainWindow:
             
             # Draw fps indicator surface
             fps_surface = pygame.Surface((60, 40))
-            fps_surface.fill(colors.space)
+            fps_surface.fill(colors.BACKGROUND)
             font = pygame.font.Font(None, 20)
-            draw_text("FPS: {}".format(fps), fps_surface, (0,0), font, colors.white)
-            draw_text("{}".format(time_per_100_frames), fps_surface, (0,20), font, colors.white)
+            draw_text("FPS: {}".format(fps), fps_surface, (0,0), font, colors.TEXT)
+            draw_text("{}".format(time_per_100_frames), fps_surface, (0,20), font, colors.TEXT)
             self.screen.blit(fps_surface, (self.width - 60, 0))
             
             pygame.display.flip()
