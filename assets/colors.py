@@ -2,6 +2,7 @@ import pygame
 
 red = pygame.Color('Red')
 darkred = pygame.Color(159, 0, 15)
+darkpurple = pygame.Color(120, 0, 80)
 green = pygame.Color('Green')
 darkgreen = pygame.Color(0, 120, 40)
 black = pygame.Color('Black')

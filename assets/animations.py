@@ -2,6 +2,7 @@ import pygame
 import time
 import constants as cons
 from util import pixel_in_focus, pixel_of_loc, abs_pixel_of_loc, distance, angle_between
+import colors
 
 """
 All animation classes should have:
@@ -13,8 +14,28 @@ update(): run every frame
 cleanup(): run after the animation finishes.
 """
 
+class Animation():
+    def __init__(self, spawn=[]):
+        self.spawn = spawn
+        self.active = True
+        
+    def spawn():
+        return self.spawn
+        
+    def in_focus(self, focus_point):
+        pass
+    
+    def draw(self, surface, focus_point):
+        pass
+        
+    def update(self):
+        pass
+        
+    def cleanup(self):
+        pass
+
 class MovementAnimation():
-    def __init__(self, unit=None, sprite=None, destinations=[(0,0),(0,0)]):
+    def __init__(self, unit=None, sprite=None, destinations=[(0,0),(0,0)], spawn=[]):
         self.unit = unit
         self.active = True
         self.last_update = time.clock()
@@ -25,6 +46,10 @@ class MovementAnimation():
         self.sprite_orientation = 0
         self.next_destination()
         self.location = self.start
+        self.spawn = spawn
+    
+    def spawn():
+        return self.spawn
     
     def in_focus(self, focus_point):
         x,y = self.rounded_location()
@@ -73,4 +98,54 @@ class MovementAnimation():
             self.unit.orientation = self.sprite_orientation
             self.unit.hidden = False
         self.active = False
+
+class LaserAnimation():
+    def __init__(self, point1, point2, source=None, color=colors.white, lifetime=0.3, spawn=[]):
+        self.point1 = point1
+        self.point2 = point2
+        self.original_color = color
+        self.color = color
+        self.spawn = spawn
+        self.active = True
+        self.lifetime = float(lifetime)
+        self.final_decay = 0.2
+        self.decay_base = self.final_decay ** (1 / lifetime)
+        self.start_time = time.clock()
+        self.source = source
+        if self.source is not None:
+            self.previous_orientation = self.source.orientation
+            self.source.orientation = angle_between(point1, point2)
+    
+    def spawn():
+        return self.spawn
         
+    def in_focus(self, focus_point):
+        return (pixel_in_focus(self.point1, focus_point) or pixel_in_focus(self.point2, focus_point))
+        # TODO improve this
+    
+    def draw(self, surface, focus_point):
+        p1 = (self.point1[0] - focus_point[0] + cons.TILESIZE / 2, self.point1[1] - focus_point[1] + cons.TILESIZE / 2)
+        p2 = (self.point2[0] - focus_point[0] + cons.TILESIZE / 2, self.point2[1] - focus_point[1] + cons.TILESIZE / 2)
+        if time.clock() - self.start_time < 0.2:
+            pygame.draw.line(surface, self.color, p1, p2, 5)
+        elif time.clock() - self.start_time < 0.25:
+            pygame.draw.line(surface, self.color, p1, p2, 3)
+        else:
+            pygame.draw.line(surface, self.color, p1, p2, 1)
+        
+    def update(self):
+        # TODO update self.color
+        strength_factor = self.decay_base ** (time.clock() - self.start_time)
+        new_r = int(self.original_color.r * strength_factor)
+        new_g = int(self.original_color.g * strength_factor)
+        new_b = int(self.original_color.b * strength_factor)
+        
+        self.color = pygame.Color(new_r, new_g, new_b)
+        
+        if time.clock() > self.start_time + self.lifetime:
+            self.active = False
+            self.cleanup()
+        
+    def cleanup(self):
+        if self.source is not None:
+            self.source.orientation = self.previous_orientation

@@ -43,6 +43,7 @@ class MainWindow:
         last_time_pressed = time.clock()
         echoing = False
         
+        self.moved = False # whether the unit has moved and is waiting on an attack input
         
         # selection variables
         self.selected_tile = None
@@ -60,6 +61,8 @@ class MainWindow:
             self.selected_unit = self.selected_tile.unit
             if self.selected_unit is not None:
                 self.locs_in_range = bfs(self.map, self.selected_tile.location, self.selected_unit.get_speed())
+            else:
+                self.locs_in_range = {}
         
         while True:
             if fps_time_counter == 100:
@@ -88,29 +91,44 @@ class MainWindow:
                             continue
                         if self.selected_unit is not None:
                             # A unit is currently selected.
-                            self.selected_tile = self.map.get_tile(clicked_loc)
-                            if self.selected_tile.traversable and self.selected_tile.unit is None:
-                                #~ Move command
-                                # If the selected tile is traversable and empty:
-                                # Calculate the path from the location to the tile
-                                path = a_star(self.map, self.selected_unit.location, clicked_loc)
-                                if path is not None:
-                                    # Simplify the path and turn it into a sequence of pixels
-                                    pixel_path = [abs_pixel_of_loc(dest) for dest in simplify_path(path)]
-                                    self.selected_unit.hidden = True
-                                    # Generate a MovementAnimation
-                                    self.map.animations.append(animations.MovementAnimation(unit=self.selected_unit, destinations=pixel_path))
-                                    
-                                    # Actually move the selected unit to the selected tile.
-                                    self.map.move_unit(self.selected_unit, clicked_loc)
-                                deselect()
-                            elif self.selected_tile.unit is self.selected_unit:
-                                # deselect the tile and unit
-                                deselect()
+                            if not self.moved:
+                                self.selected_tile = self.map.get_tile(clicked_loc)
+                                if self.selected_tile.traversable and self.selected_tile.unit is None:
+                                    #~ Move command
+                                    # If the selected tile is traversable and empty:
+                                    # Calculate the path from the location to the tile
+                                    path = a_star(self.map, self.selected_unit.location, clicked_loc)
+                                    if path is not None:
+                                        # Simplify the path and turn it into a sequence of pixels
+                                        pixel_path = [abs_pixel_of_loc(dest) for dest in simplify_path(path)]
+                                        self.selected_unit.hidden = True
+                                        # Generate a MovementAnimation
+                                        self.map.animations.append(animations.MovementAnimation(unit=self.selected_unit, destinations=pixel_path))
+                                        
+                                        # Actually move the selected unit to the selected tile.
+                                        self.map.move_unit(self.selected_unit, clicked_loc)
+                                        
+                                        self.locs_in_range = bfs(self.map, self.selected_unit.location, self.selected_unit.get_range(), blockable = False)
+                                        self.moved = True
+                                    else:
+                                        deselect()
+                                elif self.selected_tile.unit is self.selected_unit:
+                                    # deselect the tile and unit
+                                    deselect()
+                                else:
+                                    # select a new tile and unit
+                                    select(clicked_loc)
                             else:
-                                # select a new tile and unit
-                                select(clicked_loc)
-                                
+                                if clicked_loc != self.selected_tile.location:
+                                    # Received attack input.
+                                    self.moved = False
+                                    
+                                    if clicked_loc in self.locs_in_range:
+                                        # attack selected tile
+                                        laser_animation = animations.LaserAnimation(pixel_of_loc(self.selected_tile.location, self.focus_point), pixel_of_loc(clicked_loc, self.focus_point), color=colors.green, source=self.selected_unit)
+                                        self.map.animations.append(laser_animation)
+                                    
+                                    deselect()
                         else:
                             if self.selected_tile == self.map.get_tile(clicked_loc):
                                 # If the same tile is clicked, deselect
@@ -204,7 +222,10 @@ class MainWindow:
                         pygame.draw.line(self.screen, colors.darkred, (pxx + 20, pxy+60), (pxx + 60, pxy + 20))
                         pygame.draw.line(self.screen, colors.darkred, (pxx + 40, pxy+60), (pxx + 60, pxy + 40))
                     if loc in self.locs_in_range:
-                        self.highlight_tile(loc, colors.darkgreen, 3)
+                        if not self.moved:
+                            self.highlight_tile(loc, colors.darkgreen, 3)
+                        else:
+                            self.highlight_tile(loc, colors.darkpurple, 3)
             
 
             
@@ -215,7 +236,11 @@ class MainWindow:
             # Draw units in focus
             for unit in self.map.units:
                 if unit.location is not None and not unit.hidden and loc_in_focus(unit.location, self.focus_point):
-                    self.screen.blit(pygame.transform.rotate(unit.sprite, unit.orientation), pixel_of_loc(unit.location, self.focus_point))
+                    rotated_sprite = pygame.transform.rotate(unit.sprite, unit.orientation)
+                    rotated_width = rotated_sprite.get_width()
+                    rotated_height = rotated_sprite.get_height()
+                    px, py = pixel_of_loc(unit.location, self.focus_point)
+                    self.screen.blit(rotated_sprite, (px + cons.TILESIZE / 2 - rotated_width / 2, py + cons.TILESIZE / 2 - rotated_height / 2))
             
             #~ Update and draw animations
             self.map.animations = [animation for animation in self.map.animations if animation.active]
@@ -241,12 +266,9 @@ class MainWindow:
             else:
                 draw_text("Selected unit: {}".format(self.selected_unit.name), console, (10,30), font, colors.holocyan)
                 draw_text("Location: {}".format(self.selected_unit.location), console, (10,50), font, colors.holocyan)
-            draw_text("{} animations active".format(len(self.map.animations)), console, (10,70), font, colors.holocyan)
-            if len(self.map.animations) > 0:
-                draw_text("animation at {}".format(self.map.animations[0].location), console, (10,90), font, colors.holocyan)
-                draw_text("start: {}".format(self.map.animations[0].start), console, (10,110), font, colors.holocyan)
-                draw_text("end: {}".format(self.map.animations[0].end), console, (10,130), font, colors.holocyan)
-                
+            draw_text("Moved: {}".format(self.moved), console, (10,70), font, colors.holocyan)
+            draw_text("{} animations active".format(len(self.map.animations)), console, (10,90), font, colors.holocyan)
+            
             
             self.screen.blit(console, CS_origin)
             

@@ -36,10 +36,16 @@ class Unit:
         cloned.base_attack = self.base_attack
         cloned.base_defense = self.base_defense
         cloned.base_speed = self.base_speed
+        cloned.base_range = self.base_range
         cloned.sprite = self.sprite
+        cloned.orientation = self.orientation
+        cloned.hidden = self.hidden
         return cloned
     
     def get_speed(self):
         return self.base_speed
+    
+    def get_range(self):
+        return self.base_range
 
 Leonidas = Unit(name="Leonidas", base_hp=10000, base_attack=1000, base_defense=1000, base_speed=10, base_range=8, sprite=pygame.image.load('assets/units/leonidas.png'))
