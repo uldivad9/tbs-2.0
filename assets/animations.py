@@ -19,11 +19,12 @@ cleanup(): run after the animation finishes.
 """
 
 class Animation():
-    def __init__(self, spawn=[]):
-        self.spawn = spawn
+    def __init__(self):
         self.active = True
         self.waiting = False
         self.locking = False
+        
+        self.activate()
         
     def activate(self):
         self.start_time = time.clock()
@@ -41,7 +42,7 @@ class Animation():
         pass
 
 class MovementAnimation():
-    def __init__(self, unit=None, sprite=None, destinations=[(0,0),(0,0)], spawn=[]):
+    def __init__(self, unit=None, sprite=None, destinations=[(0,0),(0,0)]):
         self.unit = unit
         self.active = True
         self.last_update = time.clock()
@@ -52,7 +53,6 @@ class MovementAnimation():
         self.sprite_orientation = 0
         self.next_destination()
         self.location = self.start
-        self.spawn = spawn
         self.waiting = True
         self.locking = False
     
@@ -108,8 +108,7 @@ class MovementAnimation():
         self.active = False
 
 class DeathAnimation():
-    def __init__(self, origin=None, sprite=None, waittime = 1.3, fadetime=0.7, spawn=[]):
-        self.spawn = spawn
+    def __init__(self, origin=None, sprite=None, waittime = 1.3, fadetime=0.7):
         self.active = True
         self.waiting = True
         self.locking = False
@@ -178,12 +177,11 @@ class DeathAnimation():
         self.waiting = False
 
 class LaserAnimation():
-    def __init__(self, point1, point2, source=None, color=colors.white, lifetime=0.3, spawn=[]):
+    def __init__(self, point1, point2, source=None, color=colors.white, lifetime=0.3):
         self.point1 = point1
         self.point2 = point2
         self.original_color = color
         self.color = color
-        self.spawn = spawn
         self.active = True
         self.lifetime = float(lifetime)
         self.final_decay = 0.2
@@ -233,8 +231,7 @@ class LaserAnimation():
 
 
 class Explosion():
-    def __init__(self, origin=None, spawn=[], radius=50, destination=None, spark_count=200, spark_size=3, start_spread=0, end_spread=1):
-        self.spawn = spawn
+    def __init__(self, origin=None, radius=50, destination=None, spark_count=200, spark_size=3, start_spread=0, end_spread=1):
         self.active = True
         self.waiting = False
         self.locking = False
@@ -301,8 +298,7 @@ class Explosion():
         pass
 
 class DamageText():
-    def __init__(self, origin=None, amount=0, spawn=[]):
-        self.spawn = spawn
+    def __init__(self, origin=None, amount=0):
         self.active = True
         self.waiting = False
         self.locking = False
@@ -335,3 +331,73 @@ class DamageText():
     
     def cleanup(self):
         pass
+
+class TurnIndicator():
+    def __init__(self, text):
+        self.active = True
+        self.waiting = False
+        self.locking = True
+        self.center = (800, 450)
+        self.final = (400, 360)
+        self.time1 = .18 # open vertically
+        self.time2 = .25 # open horizontally
+        self.time3 = .7 # wait and display text
+        self.time4 = 1  # unused
+        self.text = text
+        self.activate()
+    
+    def activate(self):
+        self.start_time = time.clock()
+    
+    def in_focus(self):
+        return True
+    
+    def draw(self, surface):
+        elapsed_time = time.clock() - self.start_time
+        
+        currentx, currenty = self.final
+        text_reveal = 0
+        
+        if elapsed_time < self.time1: # open vertically
+            currentx = self.center[0]
+            currenty = int(self.center[1] + (self.final[1] - self.center[1]) * elapsed_time / self.time1)
+        elif elapsed_time < self.time1 + self.time2: # open horizontally
+            currentx = int(self.center[0] + (self.final[0] - self.center[0]) * (elapsed_time - self.time1) / self.time2)
+            currenty = self.final[1]
+            text_reveal = (elapsed_time - self.time1) / self.time2
+        elif elapsed_time < self.time1 + self.time2 + self.time3: # display text
+            currentx, currenty = self.final
+            text_reveal = 1
+        elif elapsed_time < self.time1 + self.time2 + self.time3 + self.time1:
+            currentx = self.final[0]
+            currenty = int(self.final[1] + (self.center[1] - self.final[1]) * (elapsed_time - self.time1 - self.time2 - self.time3) / self.time1)
+        else:
+            currenty = self.center[1]
+            currentx = int(self.final[0] + (self.center[0] - self.final[0]) * (elapsed_time - self.time1 - self.time1 - self.time2 - self.time3) / self.time2)
+        
+        pygame.draw.rect(surface, colors.hologreen, pygame.Rect(currentx, currenty, 2 * (self.center[0] - currentx), 2 * (self.center[1] - currenty)))
+        pygame.draw.line(surface, colors.holocyan, (currentx, currenty), (self.center[0] * 2 - currentx, currenty))
+        pygame.draw.line(surface, colors.holocyan, (currentx, self.center[1] * 2 - currenty), (self.center[0] * 2 - currentx, self.center[1] * 2 - currenty))
+        if text_reveal > 0:
+            text = fonts.MAIN_MESSAGE_FONT.render(self.text, True, colors.holocyan)
+            rect = text.get_rect()
+            '''
+            width = rect.width
+            height = rect.height
+            blit_location = (self.center[0] - width / 2, self.center[1] - height / 2)
+            surface.blit(text.subsurface(pygame.Rect(0, 0, min(int(width * text_reveal), width), height)), blit_location)
+            '''
+            orig_width = rect.width
+            width = rect.width * text_reveal
+            height = rect.height
+            subsurf = text.subsurface(pygame.Rect(orig_width/2 - width/2, 0, width, height))
+            surface.blit(subsurf, (self.center[0] - width/2, self.center[1] - height/2))
+        
+    def update(self):
+        if time.clock() - self.start_time > self.time1*2 + self.time2*2 + self.time3:
+            self.active - False
+            self.cleanup()
+        
+    def cleanup(self):
+        self.active = False
+        self.locking = False

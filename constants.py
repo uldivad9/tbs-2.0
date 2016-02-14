@@ -34,10 +34,10 @@ CS_VMARGIN = 60
 CS_SIZE = (380, 380)
 
 # Time before key echos (in seconds)
-KEY_ECHO_START_DELAY = .3
+KEY_ECHO_START_DELAY = .2
 
 # Time between key echos (in seconds)
-KEY_ECHO_REPEAT_DELAY = .10
+KEY_ECHO_REPEAT_DELAY = .08
 
 '''
 Animation constants
@@ -57,3 +57,10 @@ DAMAGE_TEXT_LIFETIME = 0.5
 
 # Lifetime, in seconds, of an Explosion
 EXPLOSION_LIFETIME = 0.5
+
+'''
+AI constants
+'''
+
+# Amount of time the AI waits before doing something
+AI_DELAY = 0.5

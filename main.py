@@ -32,6 +32,7 @@ for x in range(40):
 background_size = get_background_size(tiles1)
 map1 = Map(generate_space(background_size[0], background_size[1], 150), tiles1)
 map1.add_unit(units.Leonidas.clone(team=Team.PLAYER), (0, 0))
+map1.add_unit(units.Leonidas.clone(team=Team.PLAYER), (0, 1))
 for loc in probe_locations:
     map1.add_unit(units.red_probe.clone(), loc)
     
@@ -46,6 +47,8 @@ class MainWindow:
         
         # The map currently in use.
         self.map = map1
+        # Global animations.
+        self.global_animations = []
         
         # The top-left pixel of the portion of the map being displayed in the battle display.
         self.focus_point = [0,0]
@@ -67,36 +70,59 @@ class MainWindow:
         # game flow variables
         self.active_player = Team.PLAYER
         self.moved = False # whether the unit has moved and is waiting on an attack input
+        self.ready_units = []
+        self.total_units = 0
         
         # selection variables
         self.selected_tile = None
         self.selected_unit = None
+        self.active_unit = None
         self.locs_in_range = {}
+        self.ai_unit = None
+        
+        def count_units():
+            self.ready_units = []
+            self.total_units = 0
+            for unit in self.map.units:
+                self.total_units += 1
+                if unit.ready:
+                    self.ready_units.append(unit)
         
         # Define functions to be used in game flow and event handling
-        def next_turn():
+        def next_turn(team):
+            self.active_player = team
+            
             if self.active_player == Team.PLAYER:
-                self.active_player = Team.ENEMY
-            else:
-                self.active_player = Team.PLAYER
+                self.global_animations.append(animations.TurnIndicator("PLAYER TURN"))
+            elif self.active_player == Team.ENEMY:
+                self.global_animations.append(animations.TurnIndicator("ENEMY TURN"))
+            
             for unit in self.map.units:
                 if unit.team == self.active_player:
-                    unit.active = True
+                    unit.ready = True
+            count_units()
+        
+        next_turn(Team.PLAYER)
         
         def deselect():
             self.selected_tile = None
             self.selected_unit = None
+            self.active_unit = None
             self.locs_in_range = {}
         
         def select(loc):
             self.selected_tile = self.map.get_tile(loc)
             
-            if self.selected_tile.unit is not None and self.selected_tile.unit.team == self.active_player:
+            if self.selected_tile.unit is not None:
                 self.selected_unit = self.selected_tile.unit
+                if self.selected_unit.ready and self.selected_unit.team == Team.PLAYER:
+                    self.active_unit = self.selected_unit
+                else:
+                    self.active_unit = None
             else:
                 self.selected_unit = None
             
-            if self.selected_unit is not None:
+            if self.active_unit is not None:
                 self.locs_in_range = bfs(self.map, self.selected_tile.location, self.selected_unit.get_speed())
             else:
                 self.locs_in_range = {}
@@ -113,12 +139,35 @@ class MainWindow:
             #~ Handle game flow
             waiting = False
             locking = False
-            for animation in self.map.animations:
+            for animation in self.map.animations + self.global_animations:
                 if animation.locking:
                     waiting = True
                     locking = True
                 elif animation.waiting:
                     waiting = True
+            
+            count_units()
+            
+            if not waiting and not locking:
+                if len(self.ready_units) == 0:
+                    # switch the active player.
+                    if self.active_player == Team.PLAYER:
+                        next_turn(Team.ENEMY)
+                    else:
+                        next_turn(Team.PLAYER)
+                
+                #~ AI
+                if self.active_player == Team.ENEMY:
+                    if self.ai_unit is None:
+                        self.ai_unit = self.ready_units[0]
+                    
+                    if not moved:
+                        #move
+                        #self.
+                        pass
+                    else:
+                        #attack
+                        pass
             
             #~ Handle events
             for event in pygame.event.get():
@@ -138,32 +187,32 @@ class MainWindow:
                         clicked_loc = loc_of_pixel(click_pixels, self.focus_point)
                         if not loc_in_focus(clicked_loc, self.focus_point):
                             continue
-                        if self.selected_unit is not None:
-                            # A unit is currently selected.
+                        if self.active_unit is not None:
+                            # A unit is currently active.
                             if not self.moved:
                                 self.selected_tile = self.map.get_tile(clicked_loc)
                                 if self.selected_tile.traversable and self.selected_tile.unit is None:
                                     #~ Move command
                                     # If the selected tile is traversable and empty:
                                     # Calculate the path from the location to the tile
-                                    path = a_star(self.map, self.selected_unit.location, clicked_loc)
+                                    path = a_star(self.map, self.active_unit.location, clicked_loc)
                                     if path is not None:
                                         # Simplify the path and turn it into a sequence of pixels
                                         pixel_path = [abs_pixel_of_loc(dest) for dest in simplify_path(path)]
-                                        self.selected_unit.hidden = True
+                                        self.active_unit.hidden = True
                                         # Generate a MovementAnimation
-                                        self.map.animations.append(animations.MovementAnimation(unit=self.selected_unit, destinations=pixel_path))
+                                        self.map.animations.append(animations.MovementAnimation(unit=self.active_unit, destinations=pixel_path))
                                         
                                         # Actually move the selected unit to the selected tile.
-                                        self.map.move_unit(self.selected_unit, clicked_loc)
+                                        self.map.move_unit(self.active_unit, clicked_loc)
                                         # Attack selection
-                                        self.locs_in_range = bfs(self.map, self.selected_unit.location, self.selected_unit.get_range(), blockable = False, include_start = False)
+                                        self.locs_in_range = bfs(self.map, self.active_unit.location, self.active_unit.get_range(), blockable = False, include_start = False)
                                         self.moved = True
                                     else:
                                         deselect()
-                                elif self.selected_tile.unit is self.selected_unit:
+                                elif self.selected_tile.unit is self.active_unit:
                                     # Don't actually move, but go to attack selection
-                                    self.locs_in_range = bfs(self.map, self.selected_unit.location, self.selected_unit.get_range(), blockable = False, include_start = False)
+                                    self.locs_in_range = bfs(self.map, self.active_unit.location, self.active_unit.get_range(), blockable = False, include_start = False)
                                     self.moved = True
                                 else:
                                     # select a new tile and unit
@@ -171,16 +220,17 @@ class MainWindow:
                             else: # moved == True
                                 # Received attack input.
                                 self.moved = False
+                                self.active_unit.ready = False
                                 
                                 if clicked_loc in self.locs_in_range:
                                     # attack selected tile
-                                    laser_animation = animations.LaserAnimation(abs_pixel_of_loc(self.selected_tile.location), abs_pixel_of_loc(clicked_loc), color=colors.blue_laser, source=self.selected_unit)
+                                    laser_animation = animations.LaserAnimation(abs_pixel_of_loc(self.selected_tile.location), abs_pixel_of_loc(clicked_loc), color=colors.blue_laser, source=self.active_unit)
                                     self.map.animations.append(laser_animation)
                                     
-                                    self.selected_unit.base_ability.activate(self.selected_unit, self.map, clicked_loc)
+                                    self.active_unit.base_ability.activate(self.active_unit, self.map, clicked_loc)
                                     
                                 deselect()
-                        else: # self.selected_unit is None
+                        else: # self.active_unit is None
                             if self.selected_tile == self.map.get_tile(clicked_loc):
                                 # If the same tile is clicked, deselect
                                 deselect()
@@ -276,7 +326,8 @@ class MainWindow:
                         pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx, pxy+60), (pxx + 60, pxy))
                         pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx + 20, pxy+60), (pxx + 60, pxy + 20))
                         pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx + 40, pxy+60), (pxx + 60, pxy + 40))
-                    if loc in self.locs_in_range:
+                    # highlight locs in range unless the currently selected unit is hidden.
+                    if loc in self.locs_in_range and not (self.selected_unit is not None and self.selected_unit.hidden):
                         if not self.moved:
                             self.highlight_tile(loc, colors.MOVE_HIGHLIGHT, 3)
                         else:
@@ -291,11 +342,17 @@ class MainWindow:
             # Draw units in focus
             for unit in self.map.units:
                 if unit.location is not None and not unit.hidden and loc_in_focus(unit.location, self.focus_point):
+                    # if the unit is ready, draw a little rotating thing around it
+                    if unit.ready:
+                        angle = (time.clock() % 2) * math.pi
+                        center = tuple_add(pixel_of_loc(unit.location, self.focus_point), (cons.TILESIZE/2, cons.TILESIZE/2))
+                        pygame.draw.circle(self.screen, colors.white, tuple_int(point_at_angle(center, angle, 25)), 3)
                     rotated_sprite = pygame.transform.rotate(unit.sprite, unit.orientation)
                     rotated_width = rotated_sprite.get_width()
                     rotated_height = rotated_sprite.get_height()
                     px, py = pixel_of_loc(unit.location, self.focus_point)
                     self.screen.blit(rotated_sprite, (px + cons.TILESIZE / 2 - rotated_width / 2, py + cons.TILESIZE / 2 - rotated_height / 2))
+                    
             
             #~ Update and draw animations
             self.map.animations = [animation for animation in self.map.animations if animation.active]
@@ -314,23 +371,26 @@ class MainWindow:
             CS_origin = (cons.BD_HMARGIN + cons.BD_SIZE[0] + cons.CS_HMARGIN, cons.CS_VMARGIN)
             self.screen.set_clip(CS_origin[0], CS_origin[1], cons.CS_SIZE[0], cons.CS_SIZE[1])
             
-            console = pygame.Surface((cons.CS_SIZE[0], cons.CS_SIZE[1]))
-            console.fill(colors.WINDOW)
-            font = pygame.font.Font(None, 20)
+            CS_lines = []
             if self.selected_tile is None:
-                text = font.render("No loc selected", True, colors.TEXT)
+                CS_lines.append("No loc selected")
             else:
-                text = font.render("Selected loc: {},{}".format(self.selected_tile.x, self.selected_tile.y), True, colors.TEXT)
-            console.blit(text, (10,10))
+                CS_lines.append("Selected loc: {},{}".format(self.selected_tile.x, self.selected_tile.y))
             if self.selected_unit is None:
-                draw_text("No unit selected", console, (10,30), font, colors.TEXT)
+                CS_lines.append("No unit selected")
             else:
-                draw_text("Selected unit: {}".format(self.selected_unit.name), console, (10,30), font, colors.TEXT)
-                draw_text("Location: {}".format(self.selected_unit.location), console, (10,50), font, colors.TEXT)
-            draw_text("Moved: {}".format(self.moved), console, (10,70), font, colors.TEXT)
-            draw_text("{} animations active".format(len(self.map.animations)), console, (10,90), font, colors.TEXT)
+                CS_lines.append("Selected unit: {}".format(self.selected_unit.name))
+                CS_lines.append("Location: {}".format(self.selected_unit.location))
+            if self.active_unit is None:
+                CS_lines.append("No active unit")
+            else:
+                CS_lines.append("Active unit: {}".format(self.active_unit.name))
+                CS_lines.append("Location: {}".format(self.active_unit.location))
+            CS_lines.append("Ready units: {}".format(len(self.ready_units)))
+            CS_lines.append("Total units: {}".format(self.total_units))
+            CS_lines.append("{} animations active".format(len(self.map.animations)))
             
-            
+            console = generate_message_window(cons.CS_SIZE[0], cons.CS_SIZE[1], CS_lines)
             self.screen.blit(console, CS_origin)
             
             self.screen.set_clip(None)
@@ -342,6 +402,13 @@ class MainWindow:
             draw_text("FPS: {}".format(fps), fps_surface, (0,0), font, colors.TEXT)
             draw_text("{}".format(time_per_100_frames), fps_surface, (0,20), font, colors.TEXT)
             self.screen.blit(fps_surface, (self.width - 60, 0))
+            
+            # Draw global animations
+            self.screen.set_clip(0, 0, 1600, 900)
+            self.global_animations = [animation for animation in self.global_animations if animation.active]
+            for animation in self.global_animations:
+                animation.update()
+                animation.draw(self.screen)
             
             pygame.display.flip()
     

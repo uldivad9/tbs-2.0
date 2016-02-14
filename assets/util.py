@@ -33,10 +33,21 @@ def angle_between(a, b):
     angle = math.atan2(b[0]-a[0], b[1]-a[1])
     return (math.degrees(angle) + 180) % 360
 
+# adds 2-element tuples element-wise and returns the results.
+def tuple_add(t1, t2):
+    return (t1[0] + t2[0], t1[1] + t2[1])
+
+def tuple_int(t):
+    return (int(t[0]), int(t[1]))
+
+# returns the point at a specified distance and angle away from a given point.
+def point_at_angle(center, angle, radius):
+    return (center[0] + radius * math.cos(angle), center[1] + radius * math.sin(angle))
+
 # returns a random point in that is the given radius away from the given center.
 def random_point_in_radius(center, radius):
     angle = random.random() * 2 * math.pi
-    return (center[0] + radius * math.cos(angle), center[1] + radius * math.sin(angle))
+    return point_at_angle(center, angle, radius)
 
 # returns the image with a color key applied. speeds up fps a lot when used on images with fully-transparent pixels.
 def apply_color_key(img):
@@ -86,7 +97,7 @@ def abs_pixel_of_loc(xy):
     return (x * cons.TILESIZE + cons.BD_HMARGIN, y * cons.TILESIZE + cons.BD_VMARGIN)
 
 #~ BFS
-def bfs(map, start, range, blockable = True, include_start = True):
+def bfs(map, start, range, blockable = True, team = None, include_start = True):
     frontier = Queue()
     frontier.put(start, 0)
     cost_so_far = {start:0}
@@ -207,3 +218,14 @@ def generate_space(x, y, num_stars):
                     rgb_value = int(255 * intensity)
                     pxarray[xval, yval] = (rgb_value, rgb_value, rgb_value)
     return space
+
+# Generates a message window of the given dimensions and containing the given array of lines.
+def generate_message_window(width, height, text):
+    console = pygame.Surface((width, height))
+    console.fill(colors.WINDOW)
+    font = pygame.font.Font(None, 20)
+    current = 10
+    for line in text:
+        draw_text(line, console, (10, current), font, colors.TEXT)
+        current += 20
+    return console
