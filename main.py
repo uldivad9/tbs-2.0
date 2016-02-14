@@ -8,13 +8,33 @@ import random
 local_path = os.getcwd()
 sys.path.append("{}/assets".format(local_path))
 sys.path.append("{}/environment".format(local_path))
-from util import draw_text, a_star, bfs, loc_in_focus, pixel_of_loc, abs_pixel_of_loc, loc_of_pixel, simplify_path
+from util import *
 from team import Team
 import animations
 import colors
 import constants as cons
-import map as maps
+from map import Map
+import abilities
+from tile import Tile
+import units
 
+tiles1 = []
+probe_locations = []
+for x in range(40):
+    tiles1.append([])
+    for y in range(30):
+        if x + y > 5 and random.random() < 0.27:
+            tiles1[x].append(Tile(x,y, traversable=False))
+        else:
+            tiles1[x].append(Tile(x,y))
+            if x + y > 5 and random.random() < 0.02:
+                probe_locations.append((x,y))
+background_size = get_background_size(tiles1)
+map1 = Map(generate_space(background_size[0], background_size[1], 150), tiles1)
+map1.add_unit(units.Leonidas.clone(team=Team.PLAYER), (0, 0))
+for loc in probe_locations:
+    map1.add_unit(units.red_probe.clone(), loc)
+    
 class MainWindow:
 
     def __init__(self, width=1600,height=900):
@@ -25,7 +45,7 @@ class MainWindow:
         self.screen.fill(colors.BACKGROUND)
         
         # The map currently in use.
-        self.map = maps.map1
+        self.map = map1
         
         # The top-left pixel of the portion of the map being displayed in the battle display.
         self.focus_point = [0,0]
@@ -156,7 +176,9 @@ class MainWindow:
                                     # attack selected tile
                                     laser_animation = animations.LaserAnimation(abs_pixel_of_loc(self.selected_tile.location), abs_pixel_of_loc(clicked_loc), color=colors.blue_laser, source=self.selected_unit)
                                     self.map.animations.append(laser_animation)
-                                
+                                    
+                                    self.selected_unit.base_ability.activate(self.selected_unit, self.map, clicked_loc)
+                                    
                                 deselect()
                         else: # self.selected_unit is None
                             if self.selected_tile == self.map.get_tile(clicked_loc):
@@ -277,10 +299,16 @@ class MainWindow:
             
             #~ Update and draw animations
             self.map.animations = [animation for animation in self.map.animations if animation.active]
+            new_animations = []
             for animation in self.map.animations:
-                animation.update()
+                spawned = animation.update()
+                if spawned is not None:
+                    new_animations += spawned
                 if animation.in_focus(self.focus_point):
                     animation.draw(self.screen, self.focus_point)
+            for animation in new_animations:
+                animation.activate()
+                self.map.animations.append(animation)
             
             # Draw console
             CS_origin = (cons.BD_HMARGIN + cons.BD_SIZE[0] + cons.CS_HMARGIN, cons.CS_VMARGIN)
@@ -317,6 +345,7 @@ class MainWindow:
             
             pygame.display.flip()
     
+    
     # Draws a inner highlight on the given tile.
     def highlight_tile(self, loc, color_in, thickness):
         topleft = pixel_of_loc(loc, self.focus_point)
@@ -331,7 +360,7 @@ class MainWindow:
             pygame.draw.line(alpha_surface, color, (i + 1, highlight_width - i), (highlight_width - i, highlight_width - i))
             pygame.draw.line(alpha_surface, color, (highlight_width - i, i + 1), (highlight_width - i, highlight_width - i - 1))
         self.screen.blit(alpha_surface, topleft)
-    
+
     def move_focus_up(self):
         self.focus_point[1] = max(0, self.focus_point[1] - cons.TILESIZE)
     

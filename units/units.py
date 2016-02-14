@@ -5,6 +5,10 @@ local_path = os.getcwd()
 sys.path.append("{}/environment".format(local_path))
 from team import Team
 import constants as cons
+import animations
+import abilities
+from util import abs_pixel_of_loc, load_image
+
 
 '''
 All units have certain stats:
@@ -16,7 +20,7 @@ sprite - pygame image
 '''
 
 class Unit:
-    def __init__(self, name="???", location=None, base_hp=None, base_attack=None, base_defense=None, base_speed=None, base_range=None, sprite=None, team = Team.ENEMY):
+    def __init__(self, name="???", location=None, base_hp=None, base_attack=None, base_defense=None, base_speed=None, base_range=None, sprite=None, team = Team.ENEMY, base_ability=None):
         self.name = name
         self.location = location
         self.base_hp = base_hp
@@ -30,6 +34,8 @@ class Unit:
         self.hidden = False
         self.team = team
         self.active = False
+        self.map = None
+        self.base_ability = base_ability
     
     def clone(self, team=None):
         cloned = Unit()
@@ -46,13 +52,35 @@ class Unit:
         cloned.hidden = self.hidden
         cloned.team = team if team is not None else self.team 
         cloned.active = self.active
+        cloned.map = self.map
+        cloned.base_ability = self.base_ability
         return cloned
+    
+    def get_attack(self):
+        return self.base_attack
     
     def get_speed(self):
         return self.base_speed
     
     def get_range(self):
         return self.base_range
+    
+    def take_damage(self, damage):
+        self.current_hp -= damage
+        px, py = abs_pixel_of_loc(self.location)
+        
+        explosion = animations.Explosion(origin = (px + cons.TILESIZE / 2, py + cons.TILESIZE / 2), spark_count=50, radius=30, spark_size=1)
+        self.map.animations.append(explosion)
+        
+        if self.current_hp <= 0:
+            death_animation = animations.DeathAnimation(origin = (px,py), sprite=self.sprite)
+            self.map.animations.append(death_animation)
+            self.map.remove_unit(self)
+        damage_text = animations.DamageText(origin = (px + cons.TILESIZE / 2, py + cons.TILESIZE / 4), amount=damage)
+        self.map.animations.append(damage_text)
+    
+#Leonidas = Unit(name="Leonidas", base_hp=10000, base_attack=1000, base_defense=1000, base_speed=10, base_range=8, sprite=pygame.image.load('assets/units/leonidas.png'), base_ability = abilities.BowAttack(8))
+#red_probe = Unit(name="Probe", base_hp=10, base_attack=0, base_defense=0, base_speed=3, base_range=0, sprite=pygame.image.load('assets/units/probe_red.png'))
 
-Leonidas = Unit(name="Leonidas", base_hp=10000, base_attack=1000, base_defense=1000, base_speed=10, base_range=8, sprite=pygame.image.load('assets/units/leonidas.png'))
-red_probe = Unit(name="Probe", base_hp=10, base_attack=0, base_defense=0, base_speed=3, base_range=0, sprite=pygame.image.load('assets/units/probe_red.png'))
+Leonidas = Unit(name="Leonidas", base_hp=10000, base_attack=1000, base_defense=1000, base_speed=10, base_range=8, sprite=load_image('assets/units/leonidas.png'), base_ability = abilities.BowAttack(8))
+red_probe = Unit(name="Probe", base_hp=10, base_attack=0, base_defense=0, base_speed=3, base_range=0, sprite=load_image('assets/units/probe_red.png'))

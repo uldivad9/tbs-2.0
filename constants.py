@@ -48,3 +48,12 @@ MOVE_ANIM_SPEED = 500
 
 # Acceleration factor, in pixels per second squared, of a MovementAnimation
 MOVE_ANIM_ACCEL = 2000
+
+# Starting speed, in pixels per second, of a DamageText
+DAMAGE_TEXT_SPEED = 50
+
+# Lifetime, in seconds, of a DamageText
+DAMAGE_TEXT_LIFETIME = 0.5
+
+# Lifetime, in seconds, of an Explosion
+EXPLOSION_LIFETIME = 0.5

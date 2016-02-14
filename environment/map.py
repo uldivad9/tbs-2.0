@@ -21,10 +21,16 @@ class Map:
         self.animations = []
         
     def add_unit(self, unit, xy):
+        unit.map = self
         self.get_tile(xy).unit = unit
         unit.location = xy
         self.units.append(unit)
-        
+    
+    def remove_unit(self, unit):
+        self.units.remove(unit)
+        self.tiles[unit.location[0]][unit.location[1]].unit = None
+        unit.location = None
+    
     def get_tile(self, xy):
         x, y = xy
         if not self.on_map(xy):
@@ -58,48 +64,3 @@ class Map:
                 neighbors.append(loc)
         return neighbors
 
-def get_background_size(tiles):
-    return (cons.TILESIZE * len(tiles) + 1, cons.TILESIZE * len(tiles[0]) + 1)
-
-# Generates a Surface consisting of black space and a bunch of stars.
-def generate_space(x, y, num_stars):
-    space = pygame.Surface((x, y))
-    pxarray = pygame.PixelArray(space)
-    
-    for i in range(num_stars):
-        radius = random.randint(3,15) # TODO: better star radius distribution
-        centerx = int(random.random() * x)
-        centery = int(random.random() * y)
-        for xval in range(max(0, centerx - radius), min(x-1, centerx + radius)):
-            for yval in range(max(0, centery - radius), min(y-1, centery + radius)):
-                distance_squared = (xval - centerx) ** 2 + (yval - centery) ** 2
-                if distance_squared >= radius:
-                    continue
-                else:
-                    intensity = float(radius - distance_squared) / radius
-                    rgb_value = int(255 * intensity)
-                    pxarray[xval, yval] = (rgb_value, rgb_value, rgb_value)
-    return space
-
-tiles1 = []
-probe_locations = []
-for x in range(40):
-    tiles1.append([])
-    for y in range(30):
-        if x + y > 5 and random.random() < 0.27:
-            tiles1[x].append(Tile(x,y, traversable=False))
-        else:
-            tiles1[x].append(Tile(x,y))
-            if x + y > 5 and random.random() < 0.02:
-                probe_locations.append((x,y))
-background_size = get_background_size(tiles1)
-map1 = Map(generate_space(background_size[0], background_size[1], 150), tiles1)
-map1.add_unit(units.Leonidas.clone(team=Team.PLAYER), (0, 0))
-for loc in probe_locations:
-    map1.add_unit(units.red_probe.clone(), loc)
-
-'''
-sys.path.append("{}/util".format(local_path))
-import util
-util.a_star(map1, (0,0), (1,0))
-'''

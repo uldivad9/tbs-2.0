@@ -4,21 +4,52 @@ import constants as cons
 import pygame
 import colors
 import math
+import random
 
-b = colors.white
+# loads the given image and applies a color key to remove full transparency.
+def load_image(path):
+    img = pygame.image.load(path)
+    return apply_color_key(img)
 
 # renders and blits the given text in the given color to the given location.
 def draw_text(text="", surface=None, location=(0,0), font=None, color=colors.white):
     rendered = font.render(text, True, color)
     surface.blit(rendered, location)
 
+# returns a blend between colors c1 and c2. If c1_ratio = 1, the output color is c1. If c1_ratio = 0, the output color is c2.
+def blend_colors(c1, c2, c1_ratio):
+    if c1_ratio > 1:
+        c1_ratio = 1
+    elif c1_ratio < 0:
+        c1_ratio = 0
+    return pygame.Color(int(c1.r * c1_ratio + c2.r * (1 - c1_ratio)), int(c1.g * c1_ratio + c2.g * (1 - c1_ratio)), int(c1.b * c1_ratio + c2.b * (1 - c1_ratio)))
 
+# returns the distance between a and b.
 def distance(a, b):
     return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
+# returns the angle from point a to point b.
 def angle_between(a, b):
     angle = math.atan2(b[0]-a[0], b[1]-a[1])
     return (math.degrees(angle) + 180) % 360
+
+# returns a random point in that is the given radius away from the given center.
+def random_point_in_radius(center, radius):
+    angle = random.random() * 2 * math.pi
+    return (center[0] + radius * math.cos(angle), center[1] + radius * math.sin(angle))
+
+# returns the image with a color key applied. speeds up fps a lot when used on images with fully-transparent pixels.
+def apply_color_key(img):
+    key = (255, 0, 255)
+    keyed = pygame.Surface(img.get_size(), depth = 24)
+    keyed.fill(key, keyed.get_rect())
+    keyed.set_colorkey(key)
+    keyed.blit(img, (0,0))
+    return keyed
+
+# 
+def get_background_size(tiles):
+    return (cons.TILESIZE * len(tiles) + 1, cons.TILESIZE * len(tiles[0]) + 1)
 
 #~ Methods for detecting whether pixels are in the display
 # Returns true if the given pixel would be within the battle display.
@@ -155,3 +186,24 @@ def simplify_path(path):
         elif not (2 * path[i][0] == path[i-1][0] + path[i+1][0] and 2 * path[i][1] == path[i-1][1] + path[i+1][1]):
             key_points.append(dest)
     return key_points
+
+#~ Pre-drawn objects
+# Generates a Surface consisting of black space and a bunch of stars.
+def generate_space(x, y, num_stars):
+    space = pygame.Surface((x, y))
+    pxarray = pygame.PixelArray(space)
+    
+    for i in range(num_stars):
+        radius = random.randint(3,15) # TODO: better star radius distribution
+        centerx = int(random.random() * x)
+        centery = int(random.random() * y)
+        for xval in range(max(0, centerx - radius), min(x-1, centerx + radius)):
+            for yval in range(max(0, centery - radius), min(y-1, centery + radius)):
+                distance_squared = (xval - centerx) ** 2 + (yval - centery) ** 2
+                if distance_squared >= radius:
+                    continue
+                else:
+                    intensity = float(radius - distance_squared) / radius
+                    rgb_value = int(255 * intensity)
+                    pxarray[xval, yval] = (rgb_value, rgb_value, rgb_value)
+    return space

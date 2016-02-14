@@ -1,8 +1,10 @@
 import pygame
 import time
 import constants as cons
-from util import pixel_in_focus, pixel_of_loc, abs_pixel_of_loc, distance, angle_between
+from util import *
 import colors
+import fonts
+import random
 
 """
 All animation classes should have:
@@ -11,7 +13,7 @@ waiting: whether the animation should lock most input.
 locking: whether the animation should lock ALL input, including screen panning.
 in_focus(focus_point): returns whether the animation should be drawn on the screen, given the focus_point.
 draw(focus_point, surface): draw the animation on the given surface
-spawn(): spawns 
+activate(self): spawns 
 update(): run every frame
 cleanup(): run after the animation finishes.
 """
@@ -23,8 +25,8 @@ class Animation():
         self.waiting = False
         self.locking = False
         
-    def spawn():
-        return self.spawn
+    def activate(self):
+        self.start_time = time.clock()
         
     def in_focus(self, focus_point):
         pass
@@ -54,8 +56,8 @@ class MovementAnimation():
         self.waiting = True
         self.locking = False
     
-    def spawn():
-        return self.spawn
+    def activate(self):
+        self.start_time = time.clock()
     
     def in_focus(self, focus_point):
         x,y = self.rounded_location()
@@ -105,6 +107,76 @@ class MovementAnimation():
             self.unit.hidden = False
         self.active = False
 
+class DeathAnimation():
+    def __init__(self, origin=None, sprite=None, waittime = 1.3, fadetime=0.7, spawn=[]):
+        self.spawn = spawn
+        self.active = True
+        self.waiting = True
+        self.locking = False
+        self.sprite = sprite
+        self.origin = origin
+        self.fadetime = fadetime
+        self.waittime = waittime
+        self.start_time = time.clock()
+        self.finally_exploded = False
+        
+        self.explosions = []
+        '''
+        if random.random() > 0.6:
+            spray_destination = random_point_in_radius((self.origin[0] + cons.TILESIZE / 2, self.origin[1] + cons.TILESIZE / 2), 70)
+            spray = Explosion(origin = (self.origin[0] + cons.TILESIZE / 2, self.origin[1] + cons.TILESIZE / 2), radius=15, destination = spray_destination, spark_count=200, spark_size=1, end_spread = 0, start_spread = 3)
+            self.explosions.append([random.random() * waittime/4, spray])
+        '''
+        for i in range(random.randint(2,4)):
+            if random.random() > 0.5:
+                # spurt of sparks
+                spray_destination = random_point_in_radius((self.origin[0] + cons.TILESIZE / 2, self.origin[1] + cons.TILESIZE / 2), 60)
+                spray = Explosion(origin = (self.origin[0] + cons.TILESIZE / 2, self.origin[1] + cons.TILESIZE / 2), radius=10, destination = spray_destination, spark_count=40, spark_size=2)
+                self.explosions.append([random.random() * waittime, spray])
+            else:
+                # small explosion
+                boom_origin = random_point_in_radius((self.origin[0] + cons.TILESIZE / 2, self.origin[1] + cons.TILESIZE / 2), 10)
+                boom = Explosion(origin = boom_origin, radius=30, spark_count=60, spark_size=2)
+                self.explosions.append([random.random() * waittime, boom])
+            
+        
+        self.keyed = apply_color_key(self.sprite)
+        
+    def activate(self):
+        self.start_time = time.clock()
+        
+    def in_focus(self, focus_point):
+        return pixel_in_focus(self.origin, focus_point)
+    
+    def draw(self, surface, focus_point):
+        elapsed_time = time.clock() - self.start_time
+        
+        if elapsed_time < self.waittime:
+            if elapsed_time % 0.12 > 0.06:
+                surface.blit(self.sprite, (self.origin[0] - focus_point[0] + 1, self.origin[1] - focus_point[1]))
+            else:
+                surface.blit(self.sprite, (self.origin[0] - focus_point[0] - 1, self.origin[1] - focus_point[1]))
+        else:
+            self.keyed.set_alpha(int(255 - 255 * (time.clock() - self.start_time - self.waittime) / self.fadetime))
+            surface.blit(self.keyed, (self.origin[0] - focus_point[0], self.origin[1] - focus_point[1]))
+        
+    def update(self):
+        spawn = []
+        for explosion in self.explosions:
+            if time.clock() - self.start_time > explosion[0]:
+                spawn.append(explosion[1])
+                explosion[0] = 99
+        if time.clock() - self.start_time > self.fadetime + self.waittime:
+            self.active = False
+            self.cleanup()
+        elif not self.finally_exploded and time.clock() - self.start_time > self.waittime:
+            self.finally_exploded = True
+            spawn.append(Explosion(origin = (self.origin[0] + cons.TILESIZE / 2, self.origin[1] + cons.TILESIZE / 2), radius=60, spark_count=300))
+        return spawn
+        
+    def cleanup(self):
+        self.waiting = False
+
 class LaserAnimation():
     def __init__(self, point1, point2, source=None, color=colors.white, lifetime=0.3, spawn=[]):
         self.point1 = point1
@@ -124,8 +196,8 @@ class LaserAnimation():
         self.waiting = True
         self.locking = False
     
-    def spawn():
-        return self.spawn
+    def activate(self):
+        self.start_time = time.clock()
         
     def in_focus(self, focus_point):
         return (pixel_in_focus(self.point1, focus_point) or pixel_in_focus(self.point2, focus_point))
@@ -157,3 +229,109 @@ class LaserAnimation():
     def cleanup(self):
         if self.source is not None:
             self.source.orientation = self.previous_orientation
+
+
+
+class Explosion():
+    def __init__(self, origin=None, spawn=[], radius=50, destination=None, spark_count=200, spark_size=3, start_spread=0, end_spread=1):
+        self.spawn = spawn
+        self.active = True
+        self.waiting = False
+        self.locking = False
+        self.origin = origin
+        self.destination = destination if destination is not None else self.origin
+        self.radius = radius
+        self.start_time = time.clock()
+        self.spark_count = spark_count
+        self.spark_size = spark_size
+        self.start_spread = start_spread
+        self.end_spread = end_spread
+        self.activate()
+        
+    def activate(self):
+        '''
+        each spark is of the form [start, end, start_time, lifetime]
+        '''
+        self.start_time = time.clock()
+        self.sparks = []
+        for i in range(self.spark_count):
+            spark_origin = self.origin
+            radius = random.randint(1,self.radius)
+            endpoint = random_point_in_radius(self.destination, radius)
+            spark_start = self.start_time + random.random() * self.start_spread
+            self.sparks.append((spark_origin, endpoint, spark_start, cons.EXPLOSION_LIFETIME + random.random() * self.end_spread))
+        
+    def in_focus(self, focus_point):
+        return pixel_in_focus(self.origin, focus_point)
+    
+    def draw(self, surface, focus_point):
+        time_elapsed = time.clock() - self.start_time
+        
+        for spark in self.sparks:
+            lifetime_elapsed = (time.clock() - spark[2]) / spark[3]
+            if lifetime_elapsed < 0 or lifetime_elapsed > 1:
+                continue
+            distance_covered = 1 - (0.33 ** (2 * lifetime_elapsed))
+            currentx = int(spark[0][0] + (spark[1][0] - spark[0][0]) * distance_covered)
+            currenty = int(spark[0][1] + (spark[1][1] - spark[0][1]) * distance_covered)
+            
+            if lifetime_elapsed < 0.5:
+                spark_color = blend_colors(colors.flame, colors.white, lifetime_elapsed * 2)
+            else:
+                spark_color = blend_colors(colors.black, colors.flame, lifetime_elapsed * 2 - 1)
+                
+            if self.spark_size > 1:
+                pygame.draw.rect(surface, spark_color, pygame.Rect(currentx - focus_point[0], currenty - focus_point[1], self.spark_size, self.spark_size))
+            else:
+                surface.set_at((currentx - focus_point[0], currenty - focus_point[1]), spark_color)
+        
+    def update(self):
+        self.sparks = [spark for spark in self.sparks if spark[3] > time.clock() - self.start_time]
+        '''
+        time_elapsed = (clock.time() - self.start_time)
+        for spark in sparks:
+            lifetime_elapsed = time_elapsed / spark.lifetime
+            spark[0][0] = 
+            spark[1][1] = 
+        '''
+        if len(self.sparks) == 0:
+            self.active = False
+        
+    def cleanup(self):
+        pass
+
+class DamageText():
+    def __init__(self, origin=None, amount=0, spawn=[]):
+        self.spawn = spawn
+        self.active = True
+        self.waiting = False
+        self.locking = False
+        self.origin = origin # point at which the text should be centered
+        self.amount = str(amount)
+        self.start_time = time.clock()
+        
+    def activate(self):
+        self.start_time = time.clock()
+        
+    def in_focus(self, focus_point):
+        age = time.clock() - self.start_time
+        rise_height = age * cons.DAMAGE_TEXT_SPEED * (1 - age / cons.DAMAGE_TEXT_LIFETIME / 2)
+        return pixel_in_focus((self.origin[0], self.origin[1] - rise_height), focus_point)
+    
+    def draw(self, surface, focus_point):
+        text = fonts.DAMAGE_TEXT_FONT.render(self.amount, True, colors.DAMAGE_TEXT_COLOR)
+        rect = text.get_rect()
+        width = rect.width
+        height = rect.height
+        age = time.clock() - self.start_time
+        rise_height = age * cons.DAMAGE_TEXT_SPEED * (1 - age / cons.DAMAGE_TEXT_LIFETIME / 2)
+        
+        surface.blit(text, (self.origin[0] - width/2 - focus_point[0], self.origin[1] - height/2 - rise_height - focus_point[1]))
+        
+    def update(self):
+        if time.clock() - self.start_time > cons.DAMAGE_TEXT_LIFETIME:
+            self.active = False
+            self.cleanup()
+    
+    def cleanup(self):
+        pass
