@@ -161,7 +161,7 @@ class MainWindow:
                     if self.ai_unit is None:
                         self.ai_unit = self.ready_units[0]
                     
-                    if not moved:
+                    if not self.moved:
                         #move
                         #self.
                         pass
