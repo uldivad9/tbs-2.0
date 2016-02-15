@@ -20,17 +20,18 @@ import units
 
 tiles1 = []
 enemy_locations = []
-for x in range(40):
+for x in range(20):
     tiles1.append([])
-    for y in range(30):
-        if x + y > 5 and random.random() < 0.27:
+    for y in range(14):
+        if x + y > 5 and random.random() < 0.26:
             tiles1[x].append(Tile(x,y, traversable=False))
         else:
             tiles1[x].append(Tile(x,y))
-            if x + y > 5 and random.random() < 0.02:
+            if x + y > 5 and random.random() < 0.03:
                 enemy_locations.append((x,y))
+
 background_size = get_background_size(tiles1)
-map1 = Map(generate_space(background_size[0], background_size[1], 150), tiles1)
+map1 = Map(generate_space(background_size[0], background_size[1], 50), tiles1)
 map1.add_unit(units.Hassan.clone(team=Team.PLAYER), (0, 0))
 map1.add_unit(units.Odysseus.clone(team=Team.PLAYER), (1, 0))
 map1.add_unit(units.Leonidas.clone(team=Team.PLAYER), (0, 1))
@@ -75,6 +76,8 @@ class MainWindow:
         self.moved = False # whether the unit has moved and is waiting on an attack input
         self.ready_units = []
         self.total_units = 0
+        self.enemy_units_alive = False
+        self.player_units_alive = False
         
         # selection variables
         self.selected_tile = None
@@ -85,10 +88,16 @@ class MainWindow:
         self.ai_last_acted = time.clock()
         
         def count_units():
+            self.enemy_units_alive = False
+            self.player_units_alive = False
             self.ready_units = []
             self.total_units = 0
             for unit in self.map.units:
                 self.total_units += 1
+                if unit.team == Team.ENEMY:
+                    self.enemy_units_alive = True
+                elif unit.team == Team.PLAYER:
+                    self.player_units_alive = True
                 if unit.ready:
                     self.ready_units.append(unit)
         
@@ -125,9 +134,10 @@ class MainWindow:
                     self.active_unit = None
             else:
                 self.selected_unit = None
+                self.active_unit = None
             
             if self.active_unit is not None:
-                self.locs_in_range = bfs(self.map, self.selected_tile.location, self.selected_unit.get_speed(), team=self.active_unit.team)
+                self.locs_in_range = bfs(self.map, self.active_unit.location, self.active_unit.get_speed(), team=self.active_unit.team)
             else:
                 self.locs_in_range = {}
         
@@ -156,6 +166,16 @@ class MainWindow:
                 locking = True
             
             count_units()
+            
+            if not waiting and not locking:
+                if self.player_units_alive == False:
+                    print("YOU LOSE")
+                    self.global_animations.append(animations.TurnIndicator("YOU LOSE", infinite=True))
+                    locking = True
+                elif self.enemy_units_alive == False:
+                    print("YOU WIN")
+                    self.global_animations.append(animations.TurnIndicator("YOU WIN", infinite=True))
+                    locking = True
             
             if not waiting and not locking:
                 if len(self.ready_units) == 0:

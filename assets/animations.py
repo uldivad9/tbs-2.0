@@ -333,7 +333,7 @@ class DamageText():
         pass
 
 class TurnIndicator():
-    def __init__(self, text):
+    def __init__(self, text, infinite=False):
         self.active = True
         self.waiting = False
         self.locking = True
@@ -344,6 +344,7 @@ class TurnIndicator():
         self.time3 = .7 # wait and display text
         self.time4 = 1  # unused
         self.text = text
+        self.infinite = infinite
         self.activate()
     
     def activate(self):
@@ -365,7 +366,7 @@ class TurnIndicator():
             currentx = int(self.center[0] + (self.final[0] - self.center[0]) * (elapsed_time - self.time1) / self.time2)
             currenty = self.final[1]
             text_reveal = (elapsed_time - self.time1) / self.time2
-        elif elapsed_time < self.time1 + self.time2 + self.time3: # display text
+        elif self.infinite or elapsed_time < self.time1 + self.time2 + self.time3: # display text
             currentx, currenty = self.final
             text_reveal = 1
         elif elapsed_time < self.time1 + self.time2 + self.time3 + self.time1:
@@ -394,7 +395,7 @@ class TurnIndicator():
             surface.blit(subsurf, (self.center[0] - width/2, self.center[1] - height/2))
         
     def update(self):
-        if time.clock() - self.start_time > self.time1*2 + self.time2*2 + self.time3:
+        if not self.infinite and time.clock() - self.start_time > self.time1*2 + self.time2*2 + self.time3:
             self.active - False
             self.cleanup()
         

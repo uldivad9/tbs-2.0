@@ -1,5 +1,10 @@
 import pygame
+import sys
+import os
+local_path = os.getcwd()
+sys.path.append("{}/environment".format(local_path))
 from util import *
+from team import Team
 
 class AI():
     def __init__(self):
@@ -36,12 +41,23 @@ class BasicAI():
             # locations of all player units
             distance = 9999
             target = None
+            # find the closest target
+            '''
             for other_unit in map.units:
                 if other_unit.team != unit.team:
                     mhd = manhattan_distance(other_unit.location, unit.location)
                     if mhd < distance:
                         distance = mhd
                         target = other_unit.location
+            '''
+            enemies = []
+            for other_unit in map.units:
+                if other_unit.team != unit.team:
+                    enemies.append(other_unit.location)
+            path_to_enemy = bfs_for_target(map, unit.location, enemies, blockable=True, team=[Team.PLAYER, Team.ENEMY], include_units=True)
+            if path_to_enemy is None:
+                return None
+            target = path_to_enemy[-1]
             # find the locations from which the target can be attacked
             locations_to_move = unit.base_ability.can_hit_target_from(unit, map, target)
             # find the closest of these locations
