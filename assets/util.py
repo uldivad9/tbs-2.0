@@ -28,6 +28,10 @@ def blend_colors(c1, c2, c1_ratio):
 def distance(a, b):
     return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
+# returns the manhattan distance between a and b.
+def manhattan_distance(a, b):
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
 # returns the angle from point a to point b.
 def angle_between(a, b):
     angle = math.atan2(b[0]-a[0], b[1]-a[1])
@@ -97,7 +101,7 @@ def abs_pixel_of_loc(xy):
     return (x * cons.TILESIZE + cons.BD_HMARGIN, y * cons.TILESIZE + cons.BD_VMARGIN)
 
 #~ BFS
-def bfs(map, start, range, blockable = True, team = None, include_start = True):
+def bfs(map, start, range, blockable = True, team = None, include_units = False, include_start = True):
     frontier = Queue()
     frontier.put(start, 0)
     cost_so_far = {start:0}
@@ -106,7 +110,7 @@ def bfs(map, start, range, blockable = True, team = None, include_start = True):
         current = frontier.get()
         
         if blockable:
-            neighbors = map.neighboring_locations(current)
+            neighbors = map.neighboring_locations(current, team)
         else:
             neighbors = map.adjacent_locations(current)
         for next in neighbors:
@@ -115,9 +119,50 @@ def bfs(map, start, range, blockable = True, team = None, include_start = True):
                 cost_so_far[next] = new_cost
                 frontier.put(next)
     
-    if not include_start:
+    if not include_units:
+        to_remove = []
+        for location in cost_so_far:
+            if map.get_tile((location[0], location[1])).unit is not None:
+                to_remove.append(location)
+        for remove in to_remove:
+            cost_so_far.pop(remove)
+        
+    if not include_start and include_units:
         cost_so_far.pop(start)
+    elif include_start and not include_units:
+        cost_so_far[start] = 0
     return cost_so_far
+
+# Performs a bfs, returning the first location in 'targets' that is found.
+def bfs_for_target(map, start, targets, blockable = True, team = None, include_units = False):
+    if start in targets:
+        return [start]
+    frontier = Queue()
+    frontier.put(start, 0)
+    cost_so_far = {start:0}
+    came_from = {}
+    came_from[start] = None
+    
+    while not frontier.empty():
+        current = frontier.get()
+        if current in targets and (include_units or map.get_tile(current).unit is None):
+            path = [current]
+            while (current != start):
+                current = came_from[current]
+                path.insert(0, current)
+            return path
+        
+        if blockable:
+            neighbors = map.neighboring_locations(current, team)
+        else:
+            neighbors = map.adjacent_locations(current)
+        for next in neighbors:
+            new_cost = cost_so_far[current] + 1
+            if next not in cost_so_far:
+                cost_so_far[next] = new_cost
+                frontier.put(next)
+                came_from[next] = current
+    return None
 
 #~ A* algorithm methods
 class PriorityQueue(Queue):
@@ -152,7 +197,7 @@ def a_star_heuristic(a, b):
     (x2, y2) = b
     return abs(x1 - x2) + abs(y1 - y2)
 
-def a_star(map, start, goal):
+def a_star(map, start, goal, team=None):
     frontier = PriorityQueue()
     frontier.put(start, 0)
     came_from = {}
@@ -168,7 +213,7 @@ def a_star(map, start, goal):
             found = True
             break
         
-        for next in map.neighboring_locations(current):
+        for next in map.neighboring_locations(current, team):
             new_cost = cost_so_far[current] + 1
             if next not in cost_so_far or new_cost < cost_so_far[next]:
                 cost_so_far[next] = new_cost

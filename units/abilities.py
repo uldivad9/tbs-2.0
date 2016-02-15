@@ -16,7 +16,10 @@ class Ability():
     def get_locs_in_range(self):
         pass
     
-    def get_tiles_in_aoe(self, map):
+    def can_hit_target_from(self, map, target_loc):
+        pass
+    
+    def get_tiles_in_aoe(self, user, map, target_loc):
         pass
     
     def activate(self):
@@ -27,7 +30,10 @@ class BowAttack():
         self.range = range
     
     def get_locs_in_range(self, user, map):
-        return bfs(map, user.location, self.range, blockable=False, include_start=False)
+        return bfs(map, user.location, self.range, blockable=False, include_units = True, include_start=False)
+    
+    def can_hit_target_from(self, map, target_loc):
+        return bfs(map, target_loc, self.range, blockable=False, include_units = True, include_start=True)
     
     def get_tiles_in_aoe(self, user, map, target_loc):
         return [map.tiles[target_loc[0]][target_loc[1]]]

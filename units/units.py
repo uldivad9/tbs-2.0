@@ -8,7 +8,7 @@ import constants as cons
 import animations
 import abilities
 from util import abs_pixel_of_loc, load_image
-
+import ai
 
 '''
 All units have certain stats:
@@ -20,7 +20,7 @@ sprite - pygame image
 '''
 
 class Unit:
-    def __init__(self, name="???", location=None, base_hp=None, base_attack=None, base_defense=None, base_speed=None, base_range=None, sprite=None, team = Team.ENEMY, base_ability=None, ai=None):
+    def __init__(self, name="???", location=None, base_hp=None, base_attack=None, base_defense=None, base_speed=None, base_range=None, sprite=None, team = Team.ENEMY, base_ability=None, ai=None, aggroed=False):
         self.name = name
         self.location = location
         self.base_hp = base_hp
@@ -37,6 +37,7 @@ class Unit:
         self.map = None
         self.base_ability = base_ability
         self.ai = ai
+        self.aggroed = aggroed
     
     def clone(self, team=None):
         cloned = Unit()
@@ -56,6 +57,7 @@ class Unit:
         cloned.map = self.map
         cloned.base_ability = self.base_ability
         cloned.ai = self.ai
+        cloned.aggroed = self.aggroed
         return cloned
     
     def get_attack(self):
@@ -85,4 +87,4 @@ class Unit:
 #red_probe = Unit(name="Probe", base_hp=10, base_attack=0, base_defense=0, base_speed=3, base_range=0, sprite=pygame.image.load('assets/units/probe_red.png'))
 
 Leonidas = Unit(name="Leonidas", base_hp=10000, base_attack=1000, base_defense=1000, base_speed=10, base_range=8, sprite=load_image('assets/units/leonidas.png'), base_ability = abilities.BowAttack(8))
-red_probe = Unit(name="Probe", base_hp=10, base_attack=5, base_defense=0, base_speed=3, base_range=1, sprite=load_image('assets/units/probe_red.png'), base_ability = abilities.BowAttack(1))
+red_probe = Unit(name="Probe", base_hp=10, base_attack=5, base_defense=0, base_speed=3, base_range=1, sprite=load_image('assets/units/probe_red.png'), base_ability = abilities.BowAttack(1), ai=ai.BasicAI())

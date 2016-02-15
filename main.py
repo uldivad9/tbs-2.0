@@ -53,6 +53,8 @@ class MainWindow:
         # The top-left pixel of the portion of the map being displayed in the battle display.
         self.focus_point = [0,0]
         
+        self.DEBUG_STOP = False
+        
     def main_loop(self):
         # fps calculation variables
         fps_time_counter = 0
@@ -79,6 +81,7 @@ class MainWindow:
         self.active_unit = None
         self.locs_in_range = {}
         self.ai_unit = None
+        self.ai_last_acted = time.clock()
         
         def count_units():
             self.ready_units = []
@@ -123,7 +126,7 @@ class MainWindow:
                 self.selected_unit = None
             
             if self.active_unit is not None:
-                self.locs_in_range = bfs(self.map, self.selected_tile.location, self.selected_unit.get_speed())
+                self.locs_in_range = bfs(self.map, self.selected_tile.location, self.selected_unit.get_speed(), team=self.active_unit.team)
             else:
                 self.locs_in_range = {}
         
@@ -143,8 +146,13 @@ class MainWindow:
                 if animation.locking:
                     waiting = True
                     locking = True
+                    echoing = False
+                    key_released = True
                 elif animation.waiting:
                     waiting = True
+            
+            if self.DEBUG_STOP:
+                locking = True
             
             count_units()
             
@@ -155,19 +163,35 @@ class MainWindow:
                         next_turn(Team.ENEMY)
                     else:
                         next_turn(Team.PLAYER)
+                    self.ai_last_acted = time.clock()
+            #~ AI
+            if not waiting and not locking:
+                if self.active_player == Team.ENEMY and time.clock() - self.ai_last_acted > cons.AI_DELAY:
+                    self.ai_last_acted = time.clock()
                 
-                #~ AI
-                if self.active_player == Team.ENEMY:
-                    if self.ai_unit is None:
+                    if self.ai_unit is None or not self.ai_unit.ready:
                         self.ai_unit = self.ready_units[0]
                     
                     if not self.moved:
-                        #move
-                        #self.
-                        pass
+                        dptuple = self.ai_unit.ai.compute_move(self.ai_unit, self.map)
+                        if dptuple is not None:
+                            destination, path = dptuple
+                            self.ai_unit.hidden = True
+                            # Generate a MovementAnimation
+                            pixel_path = [abs_pixel_of_loc(dest) for dest in simplify_path(path)]
+                            self.map.animations.append(animations.MovementAnimation(unit=self.ai_unit, destinations=pixel_path))
+                            # Actually move the selected unit to the selected tile.
+                            self.map.move_unit(self.ai_unit, destination)
+                        self.moved = True
                     else:
-                        #attack
-                        pass
+                        target = self.ai_unit.ai.compute_attack(self.ai_unit, self.map)
+                        if target is not None:
+                            laser_animation = animations.LaserAnimation(abs_pixel_of_loc(self.ai_unit.location), abs_pixel_of_loc(target), color=colors.blue_laser, source=self.ai_unit)
+                            self.map.animations.append(laser_animation)
+                            self.ai_unit.base_ability.activate(self.ai_unit, self.map, target)
+                        self.moved = False
+                        self.ai_unit.ready = False
+                        
             
             #~ Handle events
             for event in pygame.event.get():
@@ -195,7 +219,7 @@ class MainWindow:
                                     #~ Move command
                                     # If the selected tile is traversable and empty:
                                     # Calculate the path from the location to the tile
-                                    path = a_star(self.map, self.active_unit.location, clicked_loc)
+                                    path = a_star(self.map, self.active_unit.location, clicked_loc, self.active_unit.team)
                                     if path is not None:
                                         # Simplify the path and turn it into a sequence of pixels
                                         pixel_path = [abs_pixel_of_loc(dest) for dest in simplify_path(path)]
@@ -206,13 +230,13 @@ class MainWindow:
                                         # Actually move the selected unit to the selected tile.
                                         self.map.move_unit(self.active_unit, clicked_loc)
                                         # Attack selection
-                                        self.locs_in_range = bfs(self.map, self.active_unit.location, self.active_unit.get_range(), blockable = False, include_start = False)
+                                        self.locs_in_range = bfs(self.map, self.active_unit.location, self.active_unit.get_range(), blockable = False, include_units = True, include_start = False)
                                         self.moved = True
                                     else:
                                         deselect()
                                 elif self.selected_tile.unit is self.active_unit:
                                     # Don't actually move, but go to attack selection
-                                    self.locs_in_range = bfs(self.map, self.active_unit.location, self.active_unit.get_range(), blockable = False, include_start = False)
+                                    self.locs_in_range = bfs(self.map, self.active_unit.location, self.active_unit.get_range(), blockable = False, include_units = True, include_start = False)
                                     self.moved = True
                                 else:
                                     # select a new tile and unit
@@ -386,6 +410,11 @@ class MainWindow:
             else:
                 CS_lines.append("Active unit: {}".format(self.active_unit.name))
                 CS_lines.append("Location: {}".format(self.active_unit.location))
+            if self.ai_unit is None:
+                CS_lines.append("No AI unit")
+            else:
+                CS_lines.append("AI unit: {}".format(self.ai_unit.name))
+                CS_lines.append("Location: {}".format(self.ai_unit.location))
             CS_lines.append("Ready units: {}".format(len(self.ready_units)))
             CS_lines.append("Total units: {}".format(self.total_units))
             CS_lines.append("{} animations active".format(len(self.map.animations)))

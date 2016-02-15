@@ -63,4 +63,4 @@ AI constants
 '''
 
 # Amount of time the AI waits before doing something
-AI_DELAY = 0.5
+AI_DELAY = 0.2

@@ -56,11 +56,12 @@ class Map:
                 neighbors.append(loc)
         return neighbors
     
-    def neighboring_locations(self, xy):
+    # 'team' is the team for which locations should be counted as being passable.
+    def neighboring_locations(self, xy, team):
         x, y = xy
         neighbors = []
         for loc in [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]:
-            if self.on_map(loc) and self.tiles[loc[0]][loc[1]].traversable and self.tiles[loc[0]][loc[1]].unit is None:
+            if self.on_map(loc) and self.tiles[loc[0]][loc[1]].traversable and (self.tiles[loc[0]][loc[1]].unit is None or self.tiles[loc[0]][loc[1]].unit.team == team):
                 neighbors.append(loc)
         return neighbors
 
