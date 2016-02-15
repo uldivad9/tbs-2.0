@@ -39,6 +39,12 @@ KEY_ECHO_START_DELAY = .2
 # Time between key echos (in seconds)
 KEY_ECHO_REPEAT_DELAY = .08
 
+# height of health bar
+HEALTH_BAR_HEIGHT = 4
+
+# pixel margin on each side of health bar
+HEALTH_BAR_HMARGIN = 1
+
 '''
 Animation constants
 '''
@@ -63,4 +69,4 @@ AI constants
 '''
 
 # Amount of time the AI waits before doing something
-AI_DELAY = 0.2
+AI_DELAY = 0.1

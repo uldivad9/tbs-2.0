@@ -14,11 +14,12 @@ hologreen = pygame.Color(14, 38, 39)
 holocyan = pygame.Color(40, 236, 230)
 gunmetal = pygame.Color(44, 53, 57)
 flame = pygame.Color(246, 40, 23)
-
+darkgrey = pygame.Color(40, 40, 40)
 
 #########################################
 
 blue_laser = pygame.Color(10, 150, 250)
+red_laser = pygame.Color(250, 10, 50)
 
 #########################################
 
@@ -34,3 +35,6 @@ ATTACK_HIGHLIGHT = darkpurple
 WINDOW = hologreen
 TEXT = holocyan
 DAMAGE_TEXT_COLOR = red
+HEALTH_BAR_ALLY = green
+HEALTH_BAR_ENEMY = red
+HEALTH_BAR_EMPTY = darkgrey

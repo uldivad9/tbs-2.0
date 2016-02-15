@@ -19,7 +19,7 @@ from tile import Tile
 import units
 
 tiles1 = []
-probe_locations = []
+enemy_locations = []
 for x in range(40):
     tiles1.append([])
     for y in range(30):
@@ -28,13 +28,14 @@ for x in range(40):
         else:
             tiles1[x].append(Tile(x,y))
             if x + y > 5 and random.random() < 0.02:
-                probe_locations.append((x,y))
+                enemy_locations.append((x,y))
 background_size = get_background_size(tiles1)
 map1 = Map(generate_space(background_size[0], background_size[1], 150), tiles1)
-map1.add_unit(units.Leonidas.clone(team=Team.PLAYER), (0, 0))
+map1.add_unit(units.Hassan.clone(team=Team.PLAYER), (0, 0))
+map1.add_unit(units.Odysseus.clone(team=Team.PLAYER), (1, 0))
 map1.add_unit(units.Leonidas.clone(team=Team.PLAYER), (0, 1))
-for loc in probe_locations:
-    map1.add_unit(units.red_probe.clone(), loc)
+for loc in enemy_locations:
+    map1.add_unit(units.skullship.clone(), loc)
     
 class MainWindow:
 
@@ -186,7 +187,7 @@ class MainWindow:
                     else:
                         target = self.ai_unit.ai.compute_attack(self.ai_unit, self.map)
                         if target is not None:
-                            laser_animation = animations.LaserAnimation(abs_pixel_of_loc(self.ai_unit.location), abs_pixel_of_loc(target), color=colors.blue_laser, source=self.ai_unit)
+                            laser_animation = animations.LaserAnimation(abs_pixel_of_loc(self.ai_unit.location), abs_pixel_of_loc(target), color=colors.red_laser, source=self.ai_unit)
                             self.map.animations.append(laser_animation)
                             self.ai_unit.base_ability.activate(self.ai_unit, self.map, target)
                         self.moved = False
@@ -230,13 +231,13 @@ class MainWindow:
                                         # Actually move the selected unit to the selected tile.
                                         self.map.move_unit(self.active_unit, clicked_loc)
                                         # Attack selection
-                                        self.locs_in_range = bfs(self.map, self.active_unit.location, self.active_unit.get_range(), blockable = False, include_units = True, include_start = False)
+                                        self.locs_in_range = self.active_unit.base_ability.get_locs_in_range(self.active_unit, self.map)
                                         self.moved = True
                                     else:
                                         deselect()
                                 elif self.selected_tile.unit is self.active_unit:
                                     # Don't actually move, but go to attack selection
-                                    self.locs_in_range = bfs(self.map, self.active_unit.location, self.active_unit.get_range(), blockable = False, include_units = True, include_start = False)
+                                    self.locs_in_range = self.active_unit.base_ability.get_locs_in_range(self.active_unit, self.map)
                                     self.moved = True
                                 else:
                                     # select a new tile and unit
@@ -377,6 +378,16 @@ class MainWindow:
                     px, py = pixel_of_loc(unit.location, self.focus_point)
                     self.screen.blit(rotated_sprite, (px + cons.TILESIZE / 2 - rotated_width / 2, py + cons.TILESIZE / 2 - rotated_height / 2))
                     
+                    # draw health bar
+                    hp = unit.current_hp
+                    max = unit.get_max_hp()
+                    health_bar_color = colors.HEALTH_BAR_ALLY if unit.team == Team.PLAYER else colors.HEALTH_BAR_ENEMY
+                    if hp == max:
+                        pygame.draw.rect(self.screen, health_bar_color, pygame.Rect(px + cons.HEALTH_BAR_HMARGIN, py + cons.TILESIZE - cons.HEALTH_BAR_HEIGHT, cons.TILESIZE - 2 * cons.HEALTH_BAR_HMARGIN, cons.HEALTH_BAR_HEIGHT))
+                    else:
+                        fill_amount = int((cons.TILESIZE - 2 * cons.HEALTH_BAR_HMARGIN) * hp / max)
+                        pygame.draw.rect(self.screen, health_bar_color, pygame.Rect(px + cons.HEALTH_BAR_HMARGIN, py + cons.TILESIZE - cons.HEALTH_BAR_HEIGHT, fill_amount, cons.HEALTH_BAR_HEIGHT))
+                        pygame.draw.rect(self.screen, colors.HEALTH_BAR_EMPTY, pygame.Rect(px + cons.HEALTH_BAR_HMARGIN + fill_amount, py + cons.TILESIZE - cons.HEALTH_BAR_HEIGHT, cons.TILESIZE - cons.HEALTH_BAR_HMARGIN - fill_amount, cons.HEALTH_BAR_HEIGHT))
             
             #~ Update and draw animations
             self.map.animations = [animation for animation in self.map.animations if animation.active]

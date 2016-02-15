@@ -13,19 +13,22 @@ class AI():
         pass
 
 class BasicAI():
-    def __init__(self, aggro_range = 10):
+    def __init__(self, aggro_range = 6):
         self.aggro_range = aggro_range
     
     def compute_move(self, unit, map):
         if not unit.aggroed:
             # check if the unit should become aggroed
-            nearby_locs = bfs(map, unit.location, self.aggro_range, blockable = False, include_units=True)
-            for loc in nearby_locs:
-                unit_there = map.get_tile(loc).unit
-                if unit_there is not None and unit_there.team != unit.team:
-                    # aggro due to nearby unit
-                    unit.aggroed = True
-                    break
+            if unit.current_hp < unit.get_max_hp():
+                unit.aggroed = True
+            else:
+                nearby_locs = bfs(map, unit.location, self.aggro_range, blockable = False, include_units=True)
+                for loc in nearby_locs:
+                    unit_there = map.get_tile(loc).unit
+                    if unit_there is not None and (unit_there.team != unit.team or unit_there.aggroed):
+                        # aggro due to nearby unit
+                        unit.aggroed = True
+                        break
         
         if not unit.aggroed:
             return None
@@ -40,7 +43,7 @@ class BasicAI():
                         distance = mhd
                         target = other_unit.location
             # find the locations from which the target can be attacked
-            locations_to_move = unit.base_ability.can_hit_target_from(map, target)
+            locations_to_move = unit.base_ability.can_hit_target_from(unit, map, target)
             # find the closest of these locations
             path = bfs_for_target(map, unit.location, locations_to_move, blockable=True, team=unit.team, include_units=False)
             if path is None or len(path) == 1:
