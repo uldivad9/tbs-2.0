@@ -45,6 +45,37 @@ HEALTH_BAR_HEIGHT = 4
 # pixel margin on each side of health bar
 HEALTH_BAR_HMARGIN = 1
 
+# margin on each side of status icons
+STATUS_ICON_HMARGIN = 1
+
+# margin on top of status icons
+STATUS_ICON_VMARGIN = 1
+
+'''
+CW - Control Window. The portion of the screen displaying controls like techs that can be used.
+'''
+
+# Top-left coordinates of the control window: (x,y)
+CW_TOPLEFT = (1220, 700)
+
+# Pixel size of the control window: (width, height)
+CW_SIZE = (360,180)
+
+# Number of pixels between the left edge of the constrol window and the first button, as well as between buttons
+CW_BUTTON_HMARGIN = 10
+
+# Number of pixels between the top edge of the control window and the first button
+CW_BUTTON_VMARGIN = 10
+
+# Button size: (width, height)
+BUTTON_SIZE = (40,40)
+
+# Buttons per row
+BUTTONS_PER_ROW = 5
+
+# Number of button rows
+BUTTON_ROWS = 1
+
 '''
 Animation constants
 '''

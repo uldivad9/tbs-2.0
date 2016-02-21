@@ -55,6 +55,8 @@ class MainWindow:
         # The top-left pixel of the portion of the map being displayed in the battle display.
         self.focus_point = [0,0]
         
+        self.CW_origin = cons.CW_TOPLEFT
+        
         self.DEBUG_STOP = False
         
     def main_loop(self):
@@ -73,7 +75,7 @@ class MainWindow:
         
         # game flow variables
         self.active_player = Team.PLAYER
-        self.moved = False # whether the unit has moved and is waiting on an attack input
+        self.attacking = False # whether the unit has moved and is waiting on an attack input
         self.ready_units = []
         self.total_units = 0
         self.enemy_units_alive = False
@@ -86,6 +88,7 @@ class MainWindow:
         self.locs_in_range = {}
         self.ai_unit = None
         self.ai_last_acted = time.clock()
+        self.selected_ability = None
         
         def count_units():
             self.enemy_units_alive = False
@@ -122,6 +125,7 @@ class MainWindow:
             self.selected_unit = None
             self.active_unit = None
             self.locs_in_range = {}
+            self.selected_ability = None
         
         def select(loc):
             self.selected_tile = self.map.get_tile(loc)
@@ -140,6 +144,22 @@ class MainWindow:
                 self.locs_in_range = bfs(self.map, self.active_unit.location, self.active_unit.get_speed(), team=self.active_unit.team)
             else:
                 self.locs_in_range = {}
+        
+        def select_ability(ability):
+            print(self.active_unit.name)
+            print(self.active_unit.location)
+            self.selected_ability = ability
+            self.locs_in_range = ability.get_locs_in_range(self.active_unit, self.map)
+            print("inrange: {}".format(self.locs_in_range))
+        
+        def button_press(y, x):
+            if y == 0:
+                if x == 0:
+                    select_ability(self.active_unit.base_ability)
+                else:
+                    if len(self.active_unit.abilities) >= x:
+                        select_ability(self.active_unit.abilities[x-1])
+            print("button {} of row {} was pressed!".format(x, y))
         
         while True:
             if fps_time_counter == 100:
@@ -193,7 +213,7 @@ class MainWindow:
                     if self.ai_unit is None or not self.ai_unit.ready:
                         self.ai_unit = self.ready_units[0]
                     
-                    if not self.moved:
+                    if not self.attacking:
                         dptuple = self.ai_unit.ai.compute_move(self.ai_unit, self.map)
                         if dptuple is not None:
                             destination, path = dptuple
@@ -203,14 +223,14 @@ class MainWindow:
                             self.map.animations.append(animations.MovementAnimation(unit=self.ai_unit, destinations=pixel_path))
                             # Actually move the selected unit to the selected tile.
                             self.map.move_unit(self.ai_unit, destination)
-                        self.moved = True
+                        self.attacking = True
                     else:
                         target = self.ai_unit.ai.compute_attack(self.ai_unit, self.map)
                         if target is not None:
                             laser_animation = animations.LaserAnimation(abs_pixel_of_loc(self.ai_unit.location), abs_pixel_of_loc(target), color=colors.red_laser, source=self.ai_unit)
                             self.map.animations.append(laser_animation)
                             self.ai_unit.base_ability.activate(self.ai_unit, self.map, target)
-                        self.moved = False
+                        self.attacking = False
                         self.ai_unit.ready = False
                         
             
@@ -230,11 +250,24 @@ class MainWindow:
                         # left click
                         click_pixels = event.pos
                         clicked_loc = loc_of_pixel(click_pixels, self.focus_point)
-                        if not loc_in_focus(clicked_loc, self.focus_point):
+                        in_focus = loc_in_focus(clicked_loc, self.focus_point)
+                        if not in_focus:
+                            if self.active_unit is not None and self.attacking:
+                                # check if CW button was pressed
+                                clx = click_pixels[0]
+                                cly = click_pixels[1]
+                                for buttony in range(cons.BUTTON_ROWS):
+                                    for buttonx in range(cons.BUTTONS_PER_ROW):
+                                        if cly > self.CW_origin[1] + (buttony + 1) * cons.CW_BUTTON_VMARGIN + buttony * cons.BUTTON_SIZE[1]\
+                                        and cly < self.CW_origin[1] + (buttony + 1) * cons.CW_BUTTON_VMARGIN + (buttony + 1) * cons.BUTTON_SIZE[1]\
+                                        and clx > self.CW_origin[0] + (buttonx + 1) * cons.CW_BUTTON_HMARGIN + buttonx * cons.BUTTON_SIZE[0]\
+                                        and clx < self.CW_origin[0] + (buttonx + 1) * cons.CW_BUTTON_HMARGIN + (buttonx + 1) * cons.BUTTON_SIZE[0]:
+                                            button_press(buttony, buttonx)
+                                            continue
                             continue
                         if self.active_unit is not None:
                             # A unit is currently active.
-                            if not self.moved:
+                            if not self.attacking:
                                 self.selected_tile = self.map.get_tile(clicked_loc)
                                 if self.selected_tile.traversable and self.selected_tile.unit is None:
                                     #~ Move command
@@ -251,20 +284,22 @@ class MainWindow:
                                         # Actually move the selected unit to the selected tile.
                                         self.map.move_unit(self.active_unit, clicked_loc)
                                         # Attack selection
-                                        self.locs_in_range = self.active_unit.base_ability.get_locs_in_range(self.active_unit, self.map)
-                                        self.moved = True
+                                        select_ability(self.active_unit.base_ability)
+                                        #self.locs_in_range = self.active_unit.base_ability.get_locs_in_range(self.active_unit, self.map)
+                                        self.attacking = True
                                     else:
                                         deselect()
                                 elif self.selected_tile.unit is self.active_unit:
                                     # Don't actually move, but go to attack selection
-                                    self.locs_in_range = self.active_unit.base_ability.get_locs_in_range(self.active_unit, self.map)
-                                    self.moved = True
+                                    select_ability(self.active_unit.base_ability)
+                                    #self.locs_in_range = self.active_unit.base_ability.get_locs_in_range(self.active_unit, self.map)
+                                    self.attacking = True
                                 else:
                                     # select a new tile and unit
                                     select(clicked_loc)
-                            else: # moved == True
+                            else: # attacking = True
                                 # Received attack input.
-                                self.moved = False
+                                self.attacking = False
                                 self.active_unit.ready = False
                                 
                                 if clicked_loc in self.locs_in_range:
@@ -272,7 +307,8 @@ class MainWindow:
                                     laser_animation = animations.LaserAnimation(abs_pixel_of_loc(self.selected_tile.location), abs_pixel_of_loc(clicked_loc), color=colors.blue_laser, source=self.active_unit)
                                     self.map.animations.append(laser_animation)
                                     
-                                    self.active_unit.base_ability.activate(self.active_unit, self.map, clicked_loc)
+                                    self.selected_ability.activate(self.active_unit, self.map, clicked_loc)
+                                    #self.active_unit.base_ability.activate(self.active_unit, self.map, clicked_loc)
                                     
                                 deselect()
                         else: # self.active_unit is None
@@ -373,7 +409,7 @@ class MainWindow:
                         pygame.draw.line(self.screen, colors.UNTRAVERSABLE_BOUNDARY_LINE, (pxx + 40, pxy+60), (pxx + 60, pxy + 40))
                     # highlight locs in range unless the currently selected unit is hidden.
                     if loc in self.locs_in_range and not (self.selected_unit is not None and self.selected_unit.hidden):
-                        if not self.moved:
+                        if not self.attacking:
                             self.highlight_tile(loc, colors.MOVE_HIGHLIGHT, 3)
                         else:
                             self.highlight_tile(loc, colors.ATTACK_HIGHLIGHT, 3)
@@ -408,6 +444,11 @@ class MainWindow:
                         fill_amount = int((cons.TILESIZE - 2 * cons.HEALTH_BAR_HMARGIN) * hp / max)
                         pygame.draw.rect(self.screen, health_bar_color, pygame.Rect(px + cons.HEALTH_BAR_HMARGIN, py + cons.TILESIZE - cons.HEALTH_BAR_HEIGHT, fill_amount, cons.HEALTH_BAR_HEIGHT))
                         pygame.draw.rect(self.screen, colors.HEALTH_BAR_EMPTY, pygame.Rect(px + cons.HEALTH_BAR_HMARGIN + fill_amount, py + cons.TILESIZE - cons.HEALTH_BAR_HEIGHT, cons.TILESIZE - cons.HEALTH_BAR_HMARGIN - fill_amount, cons.HEALTH_BAR_HEIGHT))
+                    
+                    # draw status icons
+                    for i, mystatus in enumerate(unit.statuses):
+                        if mystatus.sprite is not None:
+                            self.screen.blit(mystatus.sprite, (px + 12 * i + cons.STATUS_ICON_HMARGIN * (i + 1), py + cons.STATUS_ICON_VMARGIN))
             
             #~ Update and draw animations
             self.map.animations = [animation for animation in self.map.animations if animation.active]
@@ -452,6 +493,15 @@ class MainWindow:
             
             console = generate_message_window(cons.CS_SIZE[0], cons.CS_SIZE[1], CS_lines)
             self.screen.blit(console, CS_origin)
+            
+            # Draw control window
+            self.screen.set_clip(self.CW_origin[0], self.CW_origin[1], cons.CW_SIZE[0], cons.CW_SIZE[1])
+            self.screen.fill(colors.hologreen)
+            
+            for j in range(cons.BUTTON_ROWS):
+                for i in range(cons.BUTTONS_PER_ROW):
+                    button_origin = tuple_add(self.CW_origin, (i * cons.BUTTON_SIZE[0] + (i + 1) * cons.CW_BUTTON_HMARGIN, j * cons.BUTTON_SIZE[1] + (j + 1) * cons.CW_BUTTON_VMARGIN))
+                    pygame.draw.rect(self.screen, colors.holocyan, Rect(button_origin[0], button_origin[1], cons.BUTTON_SIZE[0], cons.BUTTON_SIZE[1]))
             
             self.screen.set_clip(None)
             

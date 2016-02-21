@@ -7,6 +7,7 @@ from team import Team
 import constants as cons
 import animations
 import abilities
+import status
 from util import abs_pixel_of_loc, load_image
 import ai
 
@@ -20,7 +21,7 @@ sprite - pygame image
 '''
 
 class Unit:
-    def __init__(self, name="???", location=None, base_hp=None, base_attack=None, base_defense=None, base_speed=None, sprite=None, team = Team.ENEMY, base_ability=None, ai=None, aggroed=False):
+    def __init__(self, name="???", location=None, base_hp=None, base_attack=None, base_defense=None, base_speed=None, sprite=None, team = Team.ENEMY, base_ability=None, abilities=[], ai=None, aggroed=False, statuses=[]):
         self.name = name
         self.location = location
         self.base_hp = base_hp
@@ -35,8 +36,10 @@ class Unit:
         self.ready = False
         self.map = None
         self.base_ability = base_ability
+        self.abilities = abilities
         self.ai = ai
         self.aggroed = aggroed
+        self.statuses = statuses
     
     def clone(self, team=None):
         cloned = Unit()
@@ -54,12 +57,19 @@ class Unit:
         cloned.ready = self.ready
         cloned.map = self.map
         cloned.base_ability = self.base_ability
+        cloned.abilities = self.abilities
         cloned.ai = self.ai
         cloned.aggroed = self.aggroed
+        cloned.statuses = self.statuses
         return cloned
     
     def get_attack(self):
-        return self.base_attack
+        mod_attack = self.base_attack
+        for mystatus in self.statuses:
+            if isinstance(mystatus, status.CalibrateWeaponsStatus):
+                mod_attack += mystatus.power
+        
+        return mod_attack
     
     def calc_standard_damage(self):
         return self.get_attack() ** 2 / 5
@@ -80,7 +90,6 @@ class Unit:
         
         explosion = animations.Explosion(origin = (px + cons.TILESIZE / 2, py + cons.TILESIZE / 2), spark_count=50, radius=30, spark_size=1)
         self.map.animations.append(explosion)
-        
         if self.current_hp <= 0:
             death_animation = animations.DeathAnimation(origin = (px,py), sprite=self.sprite)
             self.map.animations.append(death_animation)
@@ -88,11 +97,16 @@ class Unit:
         damage_text = animations.DamageText(origin = (px + cons.TILESIZE / 2, py + cons.TILESIZE / 4), amount=damage)
         self.map.animations.append(damage_text)
     
+    def update(self):
+        for mystatus in self.statuses:
+            mystatus.update()
+        self.statuses = [mystatus for mystatus in self.statuses if mystatus.duration > 0]
+    
 #Leonidas = Unit(name="Leonidas", base_hp=10000, base_attack=1000, base_defense=1000, base_speed=10, base_range=8, sprite=pygame.image.load('assets/units/leonidas.png'), base_ability = abilities.BowAttack(8))
 #red_probe = Unit(name="Probe", base_hp=10, base_attack=0, base_defense=0, base_speed=3, base_range=0, sprite=pygame.image.load('assets/units/probe_red.png'))
 
 Leonidas = Unit(name="Leonidas", base_hp=10000, base_attack=10000, base_defense=10000, base_speed=8, sprite=load_image('assets/units/leonidas.png'), base_ability = abilities.BowAttack(3))
 Odysseus = Unit(name="Odysseus", base_hp=15000, base_attack=12000, base_defense=15000, base_speed=7, sprite=load_image('assets/units/odysseus.png'), base_ability = abilities.BowAttack(1))
-Hassan = Unit(name="Hassan", base_hp=6000, base_attack=12000, base_defense=7000, base_speed=6, sprite=load_image('assets/units/hassan.png'), base_ability = abilities.GunAttack(8))
+Hassan = Unit(name="Hassan", base_hp=6000, base_attack=12000, base_defense=7000, base_speed=6, sprite=load_image('assets/units/hassan.png'), base_ability = abilities.GunAttack(8), abilities = [abilities.CalibrateWeapons(duration=4, power=3000)])
 red_probe = Unit(name="Probe", base_hp=10, base_attack=5, base_defense=0, base_speed=3, sprite=load_image('assets/units/probe_red.png'), base_ability = abilities.BowAttack(1), ai=ai.BasicAI())
 skullship = Unit(name="???", base_hp=8000, base_attack=10000, base_defense=8000, base_speed=8, sprite=load_image('assets/units/skullship.png'), base_ability = abilities.BowAttack(1), ai=ai.BasicAI())

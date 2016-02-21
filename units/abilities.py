@@ -1,5 +1,6 @@
 import pygame
 from util import bfs, tuple_add
+import status
 
 """
 All ability classes should have:
@@ -178,3 +179,23 @@ class GunAttack():
         for tile in self.get_tiles_in_aoe(user, map, target_loc):
             if tile.unit is not None:
                 tile.unit.take_damage(user.calc_standard_damage())
+
+class CalibrateWeapons():
+    def __init__(self, user=None, duration=1, power=1000):
+        self.user = user
+        self.duration = duration
+        self.power = power
+    
+    def get_locs_in_range(self, user, map):
+        return [user.location]
+    
+    def can_hit_target_from(self, user, map, target_loc):
+        return [target_loc]
+    
+    def get_tiles_in_aoe(self, user, map, target_loc):
+        return [user.location]
+    
+    def activate(self, user, map, target_loc):
+        # remove prior instances of calibrateweaponstatus
+        user.statuses = [mystatus for mystatus in user.statuses if not isinstance(mystatus, status.CalibrateWeaponsStatus)]
+        user.statuses.append(status.CalibrateWeaponsStatus(duration=self.duration, power=self.power))
