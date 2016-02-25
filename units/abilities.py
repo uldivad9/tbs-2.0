@@ -1,5 +1,5 @@
 import pygame
-from util import bfs, tuple_add
+from util import bfs, tuple_add, load_image
 import status
 
 """
@@ -11,8 +11,9 @@ activate()
 """
 
 class Ability():
-    def __init__(self, user=None):
+    def __init__(self, user=None, sprite=None):
         self.user = user
+        self.sprite = sprite
     
     def get_locs_in_range(self):
         pass
@@ -25,10 +26,14 @@ class Ability():
     
     def activate(self):
         pass
+    
+    def get_description(self):
+        return "No data."
 
 class BowAttack():
-    def __init__(self, range=0):
+    def __init__(self, range=0, sprite=load_image('assets/icons/ability/missile_single_icon.png')):
         self.range = range
+        self.sprite = sprite
     
     def get_locs_in_range(self, user, map):
         return bfs(map, user.location, self.range, blockable=False, include_units = True, include_start=False)
@@ -43,10 +48,14 @@ class BowAttack():
         for tile in self.get_tiles_in_aoe(user, map, target_loc):
             if tile.unit is not None:
                 tile.unit.take_damage(user.calc_standard_damage())
+    
+    def get_description(self):
+        return "Damages a single target within range {}.".format(self.range)
 
 class GunAttack():
-    def __init__(self, range=0):
+    def __init__(self, range=0, sprite=load_image('assets/icons/ability/turret_icon.png')):
         self.range = range
+        self.sprite = sprite
     
     def get_locs_in_range(self, user, map):
         inrange = set()
@@ -179,12 +188,16 @@ class GunAttack():
         for tile in self.get_tiles_in_aoe(user, map, target_loc):
             if tile.unit is not None:
                 tile.unit.take_damage(user.calc_standard_damage())
+    
+    def get_description(self):
+        return "Damages three tiles in a line."
 
 class CalibrateWeapons():
-    def __init__(self, user=None, duration=1, power=1000):
+    def __init__(self, user=None, duration=1, power=1000, sprite=load_image('assets/icons/ability/calibrateweapons.png')):
         self.user = user
         self.duration = duration
         self.power = power
+        self.sprite = sprite
     
     def get_locs_in_range(self, user, map):
         return [user.location]
@@ -199,3 +212,31 @@ class CalibrateWeapons():
         # remove prior instances of calibrateweaponstatus
         user.statuses = [mystatus for mystatus in user.statuses if not isinstance(mystatus, status.CalibrateWeaponsStatus)]
         user.statuses.append(status.CalibrateWeaponsStatus(duration=self.duration, power=self.power))
+    
+    def get_description(self):
+        return "Calibrates and strengthens the ship's weaponry for {} turns.".format(self.duration)
+    
+class EMP():
+    def __init__(self, range=0, duration=1, sprite=load_image('assets/icons/ability/missile_large_icon.png')):
+        self.range = range
+        self.sprite = sprite
+        self.duration = duration
+    
+    def get_locs_in_range(self, user, map):
+        return bfs(map, user.location, self.range, blockable=False, include_units = True, include_start=False)
+    
+    def can_hit_target_from(self, user, map, target_loc):
+        return bfs(map, target_loc, self.range, blockable=False, include_units = True, include_start=True)
+    
+    def get_tiles_in_aoe(self, user, map, target_loc):
+        return [map.tiles[target_loc[0]][target_loc[1]]]
+    
+    def activate(self, user, map, target_loc):
+        for tile in self.get_tiles_in_aoe(user, map, target_loc):
+            if tile.unit is not None:
+                tile.unit.statuses.append(status.Disabled(duration=self.duration))
+                print("DISABLED")
+                tile.unit.take_damage(user.calc_standard_damage() * 1.5)
+    
+    def get_description(self):
+        return "Fires an EMP charge at a unit within {} range, dealing high damage and disabling it for {} turns.".format(self.range, self.duration)

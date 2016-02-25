@@ -89,6 +89,7 @@ class MainWindow:
         self.ai_unit = None
         self.ai_last_acted = time.clock()
         self.selected_ability = None
+        self.selected_ability_button = None
         
         def count_units():
             self.enemy_units_alive = False
@@ -116,6 +117,7 @@ class MainWindow:
             for unit in self.map.units:
                 if unit.team == self.active_player:
                     unit.ready = True
+                    unit.update()
             count_units()
         
         next_turn(Team.PLAYER)
@@ -126,6 +128,7 @@ class MainWindow:
             self.active_unit = None
             self.locs_in_range = {}
             self.selected_ability = None
+            self.selected_ability_button = None
         
         def select(loc):
             self.selected_tile = self.map.get_tile(loc)
@@ -146,20 +149,18 @@ class MainWindow:
                 self.locs_in_range = {}
         
         def select_ability(ability):
-            print(self.active_unit.name)
-            print(self.active_unit.location)
             self.selected_ability = ability
             self.locs_in_range = ability.get_locs_in_range(self.active_unit, self.map)
-            print("inrange: {}".format(self.locs_in_range))
         
         def button_press(y, x):
             if y == 0:
                 if x == 0:
                     select_ability(self.active_unit.base_ability)
+                    self.selected_ability_button = (y,x)
                 else:
                     if len(self.active_unit.abilities) >= x:
                         select_ability(self.active_unit.abilities[x-1])
-            print("button {} of row {} was pressed!".format(x, y))
+                        self.selected_ability_button = (y,x)
         
         while True:
             if fps_time_counter == 100:
@@ -285,6 +286,7 @@ class MainWindow:
                                         self.map.move_unit(self.active_unit, clicked_loc)
                                         # Attack selection
                                         select_ability(self.active_unit.base_ability)
+                                        self.selected_ability_button = (0,0)
                                         #self.locs_in_range = self.active_unit.base_ability.get_locs_in_range(self.active_unit, self.map)
                                         self.attacking = True
                                     else:
@@ -292,6 +294,7 @@ class MainWindow:
                                 elif self.selected_tile.unit is self.active_unit:
                                     # Don't actually move, but go to attack selection
                                     select_ability(self.active_unit.base_ability)
+                                    self.selected_ability_button = (0,0)
                                     #self.locs_in_range = self.active_unit.base_ability.get_locs_in_range(self.active_unit, self.map)
                                     self.attacking = True
                                 else:
@@ -498,10 +501,31 @@ class MainWindow:
             self.screen.set_clip(self.CW_origin[0], self.CW_origin[1], cons.CW_SIZE[0], cons.CW_SIZE[1])
             self.screen.fill(colors.hologreen)
             
+            # Draw ability icons
             for j in range(cons.BUTTON_ROWS):
                 for i in range(cons.BUTTONS_PER_ROW):
                     button_origin = tuple_add(self.CW_origin, (i * cons.BUTTON_SIZE[0] + (i + 1) * cons.CW_BUTTON_HMARGIN, j * cons.BUTTON_SIZE[1] + (j + 1) * cons.CW_BUTTON_VMARGIN))
-                    pygame.draw.rect(self.screen, colors.holocyan, Rect(button_origin[0], button_origin[1], cons.BUTTON_SIZE[0], cons.BUTTON_SIZE[1]))
+                    
+                    if self.selected_unit is not None:
+                        if j == 0 and i == 0:
+                            self.screen.blit(self.selected_unit.base_ability.sprite, button_origin)
+                        elif len(self.selected_unit.abilities) > j * cons.BUTTONS_PER_ROW + i - 1:
+                            self.screen.blit(self.selected_unit.abilities[j * cons.BUTTONS_PER_ROW + i - 1].sprite, button_origin)
+                        #else:
+                        #    pygame.draw.rect(self.screen, colors.holocyan, Rect(button_origin[0], button_origin[1], cons.BUTTON_SIZE[0], cons.BUTTON_SIZE[1]))
+                    
+                    if (j,i) == self.selected_ability_button:
+                        pygame.draw.line(self.screen, colors.holocyan, (button_origin[0]-1, button_origin[1]-1), (button_origin[0] + cons.BUTTON_SIZE[0] + 1, button_origin[1]-1))
+                        pygame.draw.line(self.screen, colors.holocyan, (button_origin[0]-1, button_origin[1]-1), (button_origin[0]-1, button_origin[1]+cons.BUTTON_SIZE[1]+1))
+                        pygame.draw.line(self.screen, colors.holocyan, (button_origin[0] + cons.BUTTON_SIZE[0] + 1, button_origin[1]-1), (button_origin[0] + cons.BUTTON_SIZE[0] + 1, button_origin[1]+cons.BUTTON_SIZE[1]+1))
+                        pygame.draw.line(self.screen, colors.holocyan, (button_origin[0]-1, button_origin[1]+cons.BUTTON_SIZE[1]+1), (button_origin[0] + cons.BUTTON_SIZE[0] + 1, button_origin[1]+cons.BUTTON_SIZE[1]+1))
+                    
+            self.screen.set_clip(cons.ABILITY_DESCRIPTION_TOPLEFT[0], cons.ABILITY_DESCRIPTION_TOPLEFT[1], cons.ABILITY_DESCRIPTION_SIZE[0], cons.ABILITY_DESCRIPTION_SIZE[1])
+            if self.selected_ability is not None:
+                ability_description = generate_message_window(cons.ABILITY_DESCRIPTION_SIZE[0], cons.ABILITY_DESCRIPTION_SIZE[1], [self.selected_ability.get_description()])
+                self.screen.blit(ability_description, cons.ABILITY_DESCRIPTION_TOPLEFT)
+            #else:
+            #self.screen.fill(colors.black)
             
             self.screen.set_clip(None)
             

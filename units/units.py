@@ -10,6 +10,7 @@ import abilities
 import status
 from util import abs_pixel_of_loc, load_image
 import ai
+import copy
 
 '''
 All units have certain stats:
@@ -57,10 +58,10 @@ class Unit:
         cloned.ready = self.ready
         cloned.map = self.map
         cloned.base_ability = self.base_ability
-        cloned.abilities = self.abilities
+        cloned.abilities = [ability for ability in self.abilities]
         cloned.ai = self.ai
         cloned.aggroed = self.aggroed
-        cloned.statuses = self.statuses
+        cloned.statuses = [status for status in self.statuses]
         return cloned
     
     def get_attack(self):
@@ -99,6 +100,8 @@ class Unit:
     
     def update(self):
         for mystatus in self.statuses:
+            if isinstance(mystatus, status.Disabled):
+                self.ready = False
             mystatus.update()
         self.statuses = [mystatus for mystatus in self.statuses if mystatus.duration > 0]
     
@@ -106,7 +109,7 @@ class Unit:
 #red_probe = Unit(name="Probe", base_hp=10, base_attack=0, base_defense=0, base_speed=3, base_range=0, sprite=pygame.image.load('assets/units/probe_red.png'))
 
 Leonidas = Unit(name="Leonidas", base_hp=10000, base_attack=10000, base_defense=10000, base_speed=8, sprite=load_image('assets/units/leonidas.png'), base_ability = abilities.BowAttack(3))
-Odysseus = Unit(name="Odysseus", base_hp=15000, base_attack=12000, base_defense=15000, base_speed=7, sprite=load_image('assets/units/odysseus.png'), base_ability = abilities.BowAttack(1))
+Odysseus = Unit(name="Odysseus", base_hp=15000, base_attack=12000, base_defense=15000, base_speed=7, sprite=load_image('assets/units/odysseus.png'), base_ability = abilities.BowAttack(1), abilities=[abilities.EMP(range=3, duration=2)])
 Hassan = Unit(name="Hassan", base_hp=6000, base_attack=12000, base_defense=7000, base_speed=6, sprite=load_image('assets/units/hassan.png'), base_ability = abilities.GunAttack(8), abilities = [abilities.CalibrateWeapons(duration=4, power=3000)])
 red_probe = Unit(name="Probe", base_hp=10, base_attack=5, base_defense=0, base_speed=3, sprite=load_image('assets/units/probe_red.png'), base_ability = abilities.BowAttack(1), ai=ai.BasicAI())
 skullship = Unit(name="???", base_hp=8000, base_attack=10000, base_defense=8000, base_speed=8, sprite=load_image('assets/units/skullship.png'), base_ability = abilities.BowAttack(1), ai=ai.BasicAI())

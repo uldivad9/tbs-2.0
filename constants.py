@@ -76,6 +76,12 @@ BUTTONS_PER_ROW = 5
 # Number of button rows
 BUTTON_ROWS = 1
 
+# Top-left pixel of the explanation area: (x,y)
+ABILITY_DESCRIPTION_TOPLEFT = (CW_TOPLEFT[0] + 20, CW_TOPLEFT[1] + BUTTON_ROWS * BUTTON_SIZE[1] + CW_BUTTON_VMARGIN * 2)
+
+# Pixel size of the explanation area: (width, height)
+ABILITY_DESCRIPTION_SIZE = (320, 100)
+
 '''
 Animation constants
 '''

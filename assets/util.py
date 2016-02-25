@@ -264,13 +264,39 @@ def generate_space(x, y, num_stars):
                     pxarray[xval, yval] = (rgb_value, rgb_value, rgb_value)
     return space
 
+# Wraps the given text in the given font so that it fits in a window of the given width.
+# 'text' should be a list of strings. The output will be a list of strings as well, where each string of 'text' is broken up into multiple wrapped strings.
+def word_wrap(text, font, width):
+    wrapped = []
+    for string in text:
+        words = string.split(' ')
+        concat = ''
+        for word in words:
+            #print(word)
+            if concat == '':
+                next = word
+            else:
+                next = concat + ' ' + word
+            if font.size(next)[0] > width:
+                if concat == '':
+                    # a single word is too long for the entire width. qq.
+                    wrapped.append(next)
+                    concat = ''
+                else:
+                    wrapped.append(concat)
+                    concat = word
+            else:
+                concat = next
+        wrapped.append(concat)
+    return wrapped
+
 # Generates a message window of the given dimensions and containing the given array of lines.
 def generate_message_window(width, height, text):
     console = pygame.Surface((width, height))
     console.fill(colors.WINDOW)
     font = pygame.font.Font(None, 20)
     current = 10
-    for line in text:
+    for line in word_wrap(text, font, width):
         draw_text(line, console, (10, current), font, colors.TEXT)
         current += 20
     return console

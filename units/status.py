@@ -6,7 +6,7 @@ class Status:
         self.duration = duration
         self.sprite = sprite
     
-    def update():
+    def update(self):
         self.duration -= 1
 
 class CalibrateWeaponsStatus:
@@ -14,7 +14,16 @@ class CalibrateWeaponsStatus:
         self.unit = unit
         self.duration = duration
         self.power = power
-        self.sprite = load_image('assets/icons/calibrateweaponsstatus.png')
+        self.sprite = load_image('assets/icons/status/calibrateweaponsstatus.png')
     
-    def update():
+    def update(self):
+        self.duration -= 1
+    
+class Disabled:
+    def __init__(self, unit=None, duration=4):
+        self.unit = unit
+        self.duration = duration
+        self.sprite = load_image('assets/icons/status/disabledstatus.png')
+    
+    def update(self):
         self.duration -= 1
